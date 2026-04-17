@@ -1,3 +1,62 @@
+\documentclass[10pt]{beamer}
+
+\usetheme{metropolis}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel} % Tout le contenu est en français, sauf les termes techniques
+\usepackage{minted}
+\usepackage[breakable]{tcolorbox}
+\tcbuselibrary{minted, skins}
+\usepackage{xcolor}
+
+% ----- Light Code Style (Minted) -----
+\definecolor{codebg}{HTML}{F8F9FA}
+\definecolor{codeframe}{HTML}{DFE2E5}
+
+\newtcblisting{ccode}{%
+    listing engine=minted,
+    minted style=vs,
+    minted language=c,
+    minted options={fontsize=\footnotesize, breaklines, autogobble},
+    colback=codebg,
+    colframe=codeframe,
+    boxrule=1.2pt,
+    arc=3pt,
+    left=6pt, right=4pt, top=4pt, bottom=4pt,
+    drop shadow=black!30!white,
+    listing only,
+    enhanced,
+    breakable=true
+}
+
+% ----- pwndbg Style (Clair) -----
+\definecolor{pwndbgbg}{HTML}{F8F9FA}
+\definecolor{pwndbgframe}{HTML}{DFE2E5}
+\definecolor{pwndbgred}{HTML}{E45649}
+\definecolor{pwndbgtext}{HTML}{383A42}
+
+\newtcblisting{pwndbg}[2][]{%
+    listing engine=minted,
+    minted style=vs,
+    minted language=#2,
+    minted options={fontsize=\scriptsize, breaklines},
+    colback=pwndbgbg,
+    colframe=pwndbgframe,
+    colupper=pwndbgtext,
+    boxrule=1.2pt,
+    arc=3pt,
+    left=6pt, right=4pt, top=4pt, bottom=4pt,
+    drop shadow=black!30!white,
+    title={\textcolor{pwndbgred}{\textbf{pwndbg>}} \textcolor{pwndbgtext}{\texttt{#1}}},
+    fonttitle=\bfseries\ttfamily\scriptsize,
+    coltitle=pwndbgtext,
+    colbacktitle=pwndbgframe,
+    listing only,
+    enhanced,
+    breakable=true
+}
+
+\begin{document}
 \begin{frame}[fragile]{Chunk (Exemple Markdown)}
     \textbf{Code source (C)}
     \begin{ccode}
@@ -17,3 +76,4 @@ Hello World!
 [Inferior 1 (process 1337) exited normally]
     \end{pwndbg}
 \end{frame}
+\end{document}
