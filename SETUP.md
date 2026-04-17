@@ -6,6 +6,8 @@ STRICTES CONTRAINTES :
 
     Zéro Contenu : Ne pas rédiger le corps des slides. Générer uniquement les titres des sections et des frames.
 
+    Langue : Tout le contenu doit être rédigé en français, à l'exception des termes techniques qui doivent rester en anglais.
+
     Packages : Inclure un préambule complet avec tous les packages nécessaires pour supporter le code C (minted), les analyses de mémoire (tcolorbox), les schémas (tikz) et le thème metropolis.
 
     Logique : Appliquer la règle "1 Vulnérabilité = 1 Primitive".
