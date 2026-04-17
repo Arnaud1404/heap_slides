@@ -6,7 +6,28 @@
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage[french]{babel} % Tout le contenu est en français, sauf les termes techniques
+\usepackage{inconsolata} % Police mono plus grasse pour projecteur
 \usepackage{minted}
+
+\setminted{
+    style=xcode,             % Thème clair IDE (fond blanc pur, pas de rose sur les strings)
+    fontsize=\scriptsize,    % Taille équilibrée pour Beamer
+    breaklines=true,
+    breakanywhere=true,      % Évite que le code dépasse de la slide
+    linenos=true,            % Numéros de ligne pour guider le jury
+    numbersep=5pt,
+    frame=leftline,          % Barre verticale à gauche pour délimiter
+    framerule=1.5pt,         % Plus épais pour être vu du fond
+    framesep=3mm,
+    rulecolor=\color{black}, % Noir pur pour la structure
+    bgcolor=white,           % Fond blanc pur (contraste maximum)
+    fontfamily=tt,           % Police mono standard (plus épaisse que Cascadia)
+}
+
+% Force les mots-clés en noir pur et gras pour le projecteur
+\AtBeginEnvironment{minted}{\color{black}}
+\renewcommand{\theFancyVerbLine}{\textcolor{black}{\scriptsize\arabic{FancyVerbLine}}}
+
 \usepackage[breakable]{tcolorbox}
 \usepackage{tikz}
 \usepackage{amsmath, amssymb}
@@ -15,19 +36,28 @@
 \usepackage{xcolor}
 \usepackage{listings}
 
+% ----- Couleurs pour l'analyse des chunks Heap (Optimisées LCD/DLP) -----
+\definecolor{chunkPrevSize}{HTML}{5C4033} % Brun     : prev_size (Terre d'ombre brûlée)
+\definecolor{chunkSize}{HTML}{B22222}     % Rouge    : size (Rouge profond/Alizarine)
+\definecolor{chunkFd}{HTML}{0047AB}       % Bleu     : fd (Bleu océan saturé)
+\definecolor{chunkBk}{HTML}{B8860B}       % Jaune    : bk (Ocre foncé/Or vieux)
+\definecolor{chunkFdNext}{HTML}{4B0082}   % Violet   : fd_nextsize (Pourpre impérial)
+\definecolor{chunkBkNext}{HTML}{CC5500}   % Orange   : bk_nextsize (Orange brûlé)
+\definecolor{chunkPayload}{HTML}{006400}  % Vert     : payload (Vert forêt/Émeraude)
+
 % ----- Light Code Style (Minted) -----
-\definecolor{codebg}{HTML}{F8F9FA}
-\definecolor{codeframe}{HTML}{DFE2E5}
+\definecolor{codebg}{HTML}{FFFFFF} % Blanc pur
+\definecolor{codeframe}{HTML}{000000} % Noir pur
 
 \newtcblisting{ccode}{%
     listing engine=minted,
-    minted style=vs,
+    minted style=xcode,
     minted language=c,
-    minted options={fontsize=\footnotesize, breaklines, autogobble},
-    colback=codebg,
-    colframe=codeframe,
-    boxrule=1.2pt,
-    arc=3pt,
+    minted options={fontsize=\footnotesize, breaklines, autogobble, escapeinside=@@},
+    colback=white,
+    colframe=black, % Contraste max
+    boxrule=1pt,
+    arc=0pt, % Coins carrés plus "terminal"
     left=6pt, right=4pt, top=4pt, bottom=4pt,
     drop shadow=black!30!white,
     listing only,
@@ -36,29 +66,29 @@
 }
 
 % ----- pwndbg Style (Clair) -----
-\definecolor{pwndbgbg}{HTML}{F8F9FA}
-\definecolor{pwndbgframe}{HTML}{DFE2E5}
-\definecolor{pwndbgred}{HTML}{E45649}
-\definecolor{pwndbgtext}{HTML}{383A42}
+\definecolor{pwndbgbg}{HTML}{FFFFFF} % Blanc pur
+\definecolor{pwndbgframe}{HTML}{000000} % Noir pur
+\definecolor{pwndbgred}{HTML}{C0392B}   % Rouge saturé (aligné avec chunkSize)
+\definecolor{pwndbgtext}{HTML}{000000}  % Noir pur
 \definecolor{pwndbgblue}{HTML}{0184BC}
 \definecolor{pwndbggreen}{HTML}{50A14F}
 
 \newtcblisting{pwndbg}[2][]{%
     listing engine=minted,
-    minted style=vs,
+    minted style=xcode,
     minted language=#2,
-    minted options={fontsize=\scriptsize, breaklines},
-    colback=pwndbgbg,
-    colframe=pwndbgframe,
-    colupper=pwndbgtext,
-    boxrule=1.2pt,
-    arc=3pt,
+    minted options={fontsize=\scriptsize, breaklines, escapeinside=@@},
+    colback=white,
+    colframe=black, % Contraste max
+    colupper=black,
+    boxrule=1pt,
+    arc=0pt, % Coins carrés plus "terminal"
     left=6pt, right=4pt, top=4pt, bottom=4pt,
     drop shadow=black!30!white,
-    title={\textcolor{pwndbgred}{\textbf{pwndbg>}} \textcolor{pwndbgtext}{\texttt{#1}}},
+    title={\textcolor{pwndbgred}{\textbf{pwndbg>}} \texttt{#1}},
     fonttitle=\bfseries\ttfamily\scriptsize,
-    coltitle=pwndbgtext,
-    colbacktitle=pwndbgframe,
+    coltitle=black,
+    colbacktitle=gray!20,
     listing only,
     enhanced,
     breakable=true
