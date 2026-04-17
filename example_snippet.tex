@@ -1,0 +1,19 @@
+\begin{frame}[fragile]{Chunk (Exemple Markdown)}
+    \textbf{Code source (C)}
+    \begin{ccode}
+#include <stdio.h>
+
+int main() {
+    printf("Hello World!\n");
+    return 0;
+}
+    \end{ccode}
+    
+    \vspace{0.5em}
+    \textbf{Exécution (pwndbg)}
+    \begin{pwndbg}[run]{text}
+Starting program: /out/hello
+Hello World!
+[Inferior 1 (process 1337) exited normally]
+    \end{pwndbg}
+\end{frame}

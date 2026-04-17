@@ -11,6 +11,59 @@
 \usepackage{tikz}
 \usepackage{amsmath, amssymb}
 
+\tcbuselibrary{minted, skins}
+\usepackage{xcolor}
+\usepackage{listings}
+
+% ----- Light Code Style (Minted) -----
+\definecolor{codebg}{HTML}{F8F9FA}
+\definecolor{codeframe}{HTML}{DFE2E5}
+
+\newtcblisting{ccode}{%
+    listing engine=minted,
+    minted style=vs,
+    minted language=c,
+    minted options={fontsize=\footnotesize, breaklines, autogobble},
+    colback=codebg,
+    colframe=codeframe,
+    boxrule=1.2pt,
+    arc=3pt,
+    left=6pt, right=4pt, top=4pt, bottom=4pt,
+    drop shadow=black!30!white,
+    listing only,
+    enhanced,
+    breakable=true
+}
+
+% ----- pwndbg Style (Clair) -----
+\definecolor{pwndbgbg}{HTML}{F8F9FA}
+\definecolor{pwndbgframe}{HTML}{DFE2E5}
+\definecolor{pwndbgred}{HTML}{E45649}
+\definecolor{pwndbgtext}{HTML}{383A42}
+\definecolor{pwndbgblue}{HTML}{0184BC}
+\definecolor{pwndbggreen}{HTML}{50A14F}
+
+\newtcblisting{pwndbg}[2][]{%
+    listing engine=minted,
+    minted style=vs,
+    minted language=#2,
+    minted options={fontsize=\scriptsize, breaklines},
+    colback=pwndbgbg,
+    colframe=pwndbgframe,
+    colupper=pwndbgtext,
+    boxrule=1.2pt,
+    arc=3pt,
+    left=6pt, right=4pt, top=4pt, bottom=4pt,
+    drop shadow=black!30!white,
+    title={\textcolor{pwndbgred}{\textbf{pwndbg>}} \textcolor{pwndbgtext}{\texttt{#1}}},
+    fonttitle=\bfseries\ttfamily\scriptsize,
+    coltitle=pwndbgtext,
+    colbacktitle=pwndbgframe,
+    listing only,
+    enhanced,
+    breakable=true
+}
+
 \title{Exploitation des Heap Overflows en 2026}
 \author{Arnaud Gomes \& Kamiel De Vos}
 \institute{Université de Bordeaux}
