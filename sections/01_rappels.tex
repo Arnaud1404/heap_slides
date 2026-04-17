@@ -1,0 +1,112 @@
+\section{Rappels}
+
+\subsection{Processus}
+
+Lorsqu'un programme est lancé, le système d'exploitation crée un processus. Avant même d'exécuter le code de l'utilisateur, ce processus se voit attribuer un espace d'adressage virtuel.  
+On peut, de manière simplifiée, considérer que cet espace est organisé en cinq zones principales (en réalité, il en existe davantage) :
+
+\begin{itemize}
+  \item \textbf{Code} : contient le binaire exécutable. Cette zone est généralement en lecture seule et peut être partagée entre plusieurs processus exécutant le même programme.
+  
+  \item \textbf{Données} : regroupe les variables globales et statiques, qu'elles soient initialisées ou non. Elles sont allouées lors du chargement du programme.
+  
+  \item \textbf{Tas (Heap)} : zone de mémoire dynamique utilisée par \texttt{malloc}/\texttt{free}. Elle commence à l'adresse définie par l'appel système \texttt{brk} et peut s'étendre. Pour les allocations volumineuses, \texttt{malloc} utilise plutôt \texttt{mmap}.
+  
+  \item \textbf{Bibliothèque C (libc)} : code partagé (libc.so, ld.so) chargé dynamiquement, évitant la duplication du code entre les processus.
+  
+  \item \textbf{Pile (Stack)} : zone de taille dynamique (souvent limitée à environ 8~Mo sous Linux) contenant les appels de fonctions, les arguments et les variables locales.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance = 0cm,
+    membox/.style = {
+        draw, 
+        minimum width=4cm, 
+        minimum height=1cm, 
+        outer sep=0pt, 
+        font=\sffamily\footnotesize\bfseries,
+        fill=white
+    },
+    labelstyle/.style = {
+        font=\sffamily\scriptsize\itshape, 
+        text=gray
+    },
+    bracestyle/.style = {
+        decorate, 
+        decoration={brace, amplitude=5pt, raise=2pt},
+        thick
+    },
+    descstyle/.style = {
+        midway, 
+        right=8pt, 
+        align=left, 
+        font=\scriptsize\ttfamily
+    }
+]
+
+% --- Adresses ---
+\node[labelstyle] (highAddr) at (0, 7.5) {0xFF...FF};
+\node[labelstyle] (lowAddr) at (0, -1.0) {0x00...00};
+
+% --- Segments de Mémoire ---
+\node[membox, fill=orange!10] (stack) at (0, 6.5) {Stack (Pile)};
+\node[membox, fill=blue!5] (libs) at (0, 4.5) {Shared Libraries};
+\node[membox, fill=green!10] (heap) at (0, 2.5) {Heap (Tas)};
+\node[membox, fill=gray!10] (data) at (0, 1.4) {Data / BSS};
+\node[membox, fill=gray!20] (code) at (0, 0.2) {Code (Text)};
+
+% --- Espaces vides (Pointillés) ---
+\draw[dashed, gray] (stack.south west) -- (libs.north west);
+\draw[dashed, gray] (stack.south east) -- (libs.north east);
+\draw[dashed, gray] (libs.south west) -- (heap.north west);
+\draw[dashed, gray] (libs.south east) -- (heap.north east);
+
+% --- Flèches de croissance ---
+\draw[-{Stealth[scale=1.2]}, thick, orange!80!black] 
+    (stack.south) -- ++(0,-0.8) 
+    node[midway, left, xshift=-2pt, font=\footnotesize\itshape] {Croissance};
+
+\draw[-{Stealth[scale=1.2]}, thick, green!60!black] 
+    (heap.north) -- ++(0,0.8) 
+    node[midway, left, xshift=-2pt, font=\footnotesize\itshape] {Croissance};
+
+% --- Accolades et Descriptions (à droite) ---
+\draw[bracestyle] (stack.north east) -- (stack.south east)
+    node[descstyle] {Variables locales\\Appels fonctions};
+
+\draw[bracestyle] (libs.north east) -- (libs.south east)
+    node[descstyle] {Bibliothèques liées\\(libc.so, ld.so)};
+
+\draw[bracestyle] (heap.north east) -- (heap.south east)
+    node[descstyle] {Allocation dynamique\\malloc / free};
+
+\draw[bracestyle] (data.north east) -- (data.south east)
+    node[descstyle] {Variables globales\\et statiques};
+
+\draw[bracestyle] (code.north east) -- (code.south east)
+    node[descstyle] {Binaire exécutable\\(Lecture seule)};
+
+\end{tikzpicture}
+\end{figure}
+
+Lors de l'initialisation de la heap, avant même qu'un seul appel à \texttt{malloc} ne soit effectué par le programme utilisateur, le système d'exploitation réalise un appel système \texttt{brk()} afin d'établir la zone initiale du tas.  
+À ce stade, cette zone est pratiquement vide : elle ne contient aucun espace réellement utilisable pour les allocations dynamiques.  
+Elle pourra ensuite être étendue au fur et à mesure des besoins, notamment via les appels à \texttt{malloc}, qui ajustent la limite supérieure du tas ou, pour les allocations volumineuses, utilisent directement \texttt{mmap}.
+
+\subsection{Interactions avec le noyau : les appels système}
+
+L'allocateur de la Libc ne possède pas de mémoire propre. Il agit comme un gestionnaire qui réclame des pages au noyau Linux via des appels système spécifiques. La compréhension de ces mécanismes est indispensable pour l'exploitation de la heap, car ils définissent les limites physiques et le comportement de nos débordements.
+
+\paragraph{Le segment de données et brk()}
+Le tas (\textit{heap}) est traditionnellement étendu de manière contiguë. L'appel système \texttt{brk()} permet de déplacer le \textit{program break}, qui marque la fin du segment de données du processus. L'allocateur utilise ce mécanisme pour les petites et moyennes allocations afin de maintenir une localité de cache optimale au sein de l'arène principale.
+
+\paragraph{Allocations anonymes et mmap()}
+Pour les requêtes volumineuses (supérieures au seuil \texttt{MMAP\_THRESHOLD}, généralement \textbf{128 Ko}), \texttt{malloc} utilise \texttt{mmap()} pour créer une zone de mémoire virtuelle indépendante. Contrairement au segment géré par \texttt{brk()}, ces zones sont allouées dans l'espace situé entre la pile et le tas. Elles sont totalement désolidarisées de l'arène principale, ce qui signifie qu'un heap overflow sur un chunk \texttt{mmap} ne pourra pas corrompre les métadonnées des bins classiques que nous analyserons plus loin.
+
+\subsection{Protections système : l'ASLR et son contexte d'analyse}
+L'une des barrières majeures à l'exploitation en 2026 est la randomisation de l'espace d'adressage (ASLR). Cette protection fait varier l'adresse de base de la pile, de la Libc et du tas à chaque lancement du programme. L'attaquant doit alors obtenir une "fuite mémoire" (\textit{leak}) pour recalculer les adresses réelles des fonctions cibles ou des métadonnées de l'allocateur.
+
+\paragraph{Observation durant le développement}
+Il est important de noter que, lors de nos phases de tests avec \texttt{gdb} et l'extension \texttt{pwndbg}, l'ASLR est \textbf{désactivé par défaut}. Ce comportement est voulu pour faciliter le débogage et l'analyse de la structure de la mémoire en rendant les adresses prévisibles d'une exécution à l'autre. Cependant, dans un scénario d'attaque réel sur un binaire distant ou protégé, cette sécurité est active et force l'attaquant à adapter ses techniques (comme nous le verrons dans la section sur le \textit{Tcache Poisoning}).

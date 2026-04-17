@@ -1,0 +1,285 @@
+\section{Analyse pratique de la heap}
+\label{sec:Analyse_du_tas}
+
+Vérifions ce que nous venons de dire précédemment.
+
+Vous pouvez maintenant lancer ce programme avec pwndbg.
+L'idée de ce code est d'observer les différentes "bin" et les métadonnées des chunks.
+
+\begin{minted}[frame=single, framesep=2mm, fontsize=\footnotesize, style=monokai, bgcolor=pwndbgbg]{c}
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define TCACHE_MAX 7
+
+void fill_tcache(size_t size){
+    void *ptrs[7];
+    for (unsigned i = 0; i < TCACHE_MAX; i++)
+        ptrs[i] = malloc(size);
+    for (unsigned i = 0; i < TCACHE_MAX; i++)
+        free(ptrs[i]);
+}
+
+int main(){
+
+    // Tcache
+    void *t1 = malloc(0x40), *t2 = malloc(0x100), *t3 = malloc(0x400);
+    strcpy(t1, "T1T1T1T1"); // T = 0x54 et 1 = 0x31
+    free(t1), free(t2),  free(t3);
+
+    // Fastbin
+    void *f_min = malloc(0x10),*g1 = malloc(0x30);
+    void *f_max = malloc(0x70),*g2 = malloc(0x30);
+
+    strcpy(f_max, "FFFFFFFFFFFFFFFFFFFFFFFF"); // F = 0x46
+
+    fill_tcache(0x10); fill_tcache(0x70);
+
+    free(f_min); free(f_max);
+
+    // Smallbin
+    void *s_min = malloc(0x80), *g3 = malloc(0x30);
+    void *s_max = malloc(0x3e0), *g4 = malloc(0x30);
+
+    strcpy(s_max, "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS"); // S = 0x53
+
+    fill_tcache(0x80); fill_tcache(0x3e0);
+
+    free(s_min); free(s_max);
+
+    // Largebin
+    void *l_min = malloc(0x3f0);
+
+    fill_tcache(0x3f0);
+
+    strcpy(l_min, "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL"); // S = 0x53
+
+    free(l_min);
+    malloc(0x410);
+
+    return 0;
+}
+
+
+\end{minted}
+
+
+\section*{Code couleur utilisé pour l'analyse des chunks \texttt{glibc}}
+
+Afin de faciliter la lecture et l'analyse des structures internes du tas
+(\textit{heap}) dans \texttt{glibc}, chaque champ d'un chunk est représenté
+avec une couleur spécifique.
+Ce code couleur permet d'identifier rapidement le rôle de chaque octet
+dans les dumps mémoire.
+
+\begin{itemize}
+      \item \textcolor{pwndbgbrown}{\textbf{Brun — \texttt{prev\_size}}} :
+            Taille du chunk précédent. Ce champ n'est utilisé que lorsque le bit
+            \texttt{PREV\_INUSE} est à zéro.
+
+      \item \textcolor{pwndbgred}{\textbf{Rouge — \texttt{size}}} :
+            Taille du chunk courant, incluant les bits d'état
+            (\texttt{PREV\_INUSE}, \texttt{IS\_MMAPPED}, \texttt{NON\_MAIN\_ARENA}).
+
+      \item \textcolor{pwndbgblue}{\textbf{Bleu — \texttt{fd}}} :
+            Pointeur vers le prochain chunk dans une liste chaînée
+            (fastbins, smallbins, unsorted bin, etc.).
+
+      \item \textcolor{pwndbgpurple}{\textbf{Violet — \texttt{fd\_nextsize}}} :
+            Pointeur utilisé dans les \textit{large bins} pour maintenir un tri
+            secondaire par taille.
+
+      \item \textcolor{pwndbgyellow}{\textbf{Jaune — \texttt{bk}}} :
+            Pointeur vers le chunk précédent dans une liste chaînée.
+
+      \item \textcolor{pwndbgorange}{\textbf{Orange — \texttt{bk\_nextsize}}} :
+            Pointeur complémentaire à \texttt{fd\_nextsize} dans les \textit{large bins},
+            permettant la navigation inverse dans la liste triée par taille.
+
+      \item \textcolor{pwndbgdarkgreen}{\textbf{Vert foncé — \texttt{old\_payload}}} :
+            Données utilisateur stockées dans le chunk.
+            C'est la zone retournée par \texttt{malloc()} et modifiable par le programme.
+
+      \item \textcolor{pwndbggreen}{\textbf{Vert — Payload}} :
+            Résidu d'un chunk précédent obtenu lors d'une consolidation.
+
+\end{itemize}
+
+\subsection{Tcache}
+\begin{minted}[frame=single, framesep=2mm, fontsize=\footnotesize, style=monokai, bgcolor=pwndbgbg]{c}
+void *t1 = malloc(0x40), *t2 = malloc(0x100), *t3 = malloc(0x400);
+strcpy(t1, "T1T1T1T1"); // T = 0x54 et 1 = 0x31
+free(t1), free(t2), free(t3);
+\end{minted}
+
+Au début du programme, on n'a rien, pas de heap utilisateur.
+Elle sera initialisée dès le premier \texttt{malloc}, la seule structure en place au début du programme est
+la main arena qui est dans la libc. Vous pouvez voir son adresse avec \texttt{p \&main\_arena}.
+
+Une fois que vous avez passé les trois \texttt{strcpy}, vous pouvez les retrouver avec la commande \texttt{heap}.
+Vous allez ainsi voir 5 chunks, c'est normal.
+Le premier chunk est un résidu de l'appel initial de \texttt{brk}, il sert à aligner le top chunk et à avoir
+un premier chunk valide qui sert à la gestion des bins et à la recherche des chunks.
+
+voici à quoi ressemble t1 une fois free:
+
+\begin{pwndbg}[x/40bx t1 - 0x10]{text}
+      0x555555559290: !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}!
+      0x555555559298: !\textcolor{pwndbgred}{0x51}! !\textcolor{pwndbgred}{0x00}! !\textcolor{pwndbgred}{0x00}! !\textcolor{pwndbgred}{0x00}! !\textcolor{pwndbgred}{0x00}! !\textcolor{pwndbgred}{0x00}! !\textcolor{pwndbgred}{0x00}! !\textcolor{pwndbgred}{0x00}!
+      0x5555555592a0: !\textcolor{pwndbgblue}{0x59}! !\textcolor{pwndbgblue}{0x55}! !\textcolor{pwndbgblue}{0x55}! !\textcolor{pwndbgblue}{0x55}! !\textcolor{pwndbgblue}{0x05}! !\textcolor{pwndbgblue}{0x00}! !\textcolor{pwndbgblue}{0x00}! !\textcolor{pwndbgblue}{0x00}!
+      0x5555555592a8: !\textcolor{pwndbgdarkgreen}{0x46}! !\textcolor{pwndbgdarkgreen}{0x01}! !\textcolor{pwndbgdarkgreen}{0x3a}! !\textcolor{pwndbgdarkgreen}{0x70}! !\textcolor{pwndbgdarkgreen}{0x5f}! !\textcolor{pwndbgdarkgreen}{0x9c}! !\textcolor{pwndbgdarkgreen}{0xce}! !\textcolor{pwndbgdarkgreen}{0x17}!
+      0x5555555592b0: !\textcolor{pwndbgdarkgreen}{0x54}! !\textcolor{pwndbgdarkgreen}{0x31}! !\textcolor{pwndbgdarkgreen}{0x54}! !\textcolor{pwndbgdarkgreen}{0x31}! !\textcolor{pwndbgdarkgreen}{0x54}! !\textcolor{pwndbgdarkgreen}{0x31}! !\textcolor{pwndbgdarkgreen}{0x54}! !\textcolor{pwndbgdarkgreen}{0x31}!
+\end{pwndbg}
+
+Comme le montrent les couleurs, la zone utilisateur a été immédiatement écrasée par la GLIBC pour y stocker deux métadonnées critiques propres au Tcache :
+
+En \textcolor{pwndbgblue}{bleu}, on retrouve le pointeur \texttt{fd} (forward) à la valeur 0x555555559 qui
+indique l'adresse du prochain chunk libre à partir du champs utilisateur.
+L'adresse semble illisible car, depuis la GLIBC 2.32, elle est protégée
+par le \textit{Safe Linking}. Le pointeur n'est plus stocké en clair.
+Il est masqué dynamiquement via une opération XOR utilisant
+comme t1 est le premier chunk, son fd pointe sur 0
+
+$$
+      \begin{aligned}
+            \text{fd}_{\text{encodé}} & =  (Adresse\_Chunk \gg 12) \oplus \text{fd}_{\text{réel}} \\
+                                      & = (0x5555555592a0 \gg 12) \oplus 0                        \\
+                                      & =  0x555555559
+      \end{aligned}
+$$
+
+
+En \textcolor{pwndbgdarkgreen}{vert foncé}, on observe le pointeur \texttt{key}.
+Contrairement à ce que son nom suggère, ce n'est pas une clé servant à déchiffrer
+le pointeur bleu. Il s'agit d'une sécurité anti-double-free introduite
+dans la GLIBC 2.29, qui pointe vers la \texttt{tcache\_perthread\_struct}.
+Si l'allocateur détecte cette signature lors d'un \texttt{free()},
+il parcourt préventivement la liste chaînée pour s'assurer que le bloc n'y figure pas
+déjà.
+
+\subsection{Fastbin}
+\begin{minted}[frame=single, framesep=2mm, fontsize=\footnotesize, style=monokai, bgcolor=pwndbgbg]{c}
+      void *f_min = malloc(0x10),*g1 = malloc(0x30);
+      void *f_max = malloc(0x70),*g2 = malloc(0x30);
+      strcpy(f_max, "FFFFFFFFFFFFFFFFFFFFFFFF"); // F = 0x46
+      fill_tcache(0x10); fill_tcache(0x70);
+      free(f_min); free(f_max);
+\end{minted}
+
+voici à quoi ressemble f\_max une fois free:
+
+\begin{pwndbg}[x/40bx f\_max - 0x10]{text}
+      0x555555559860: !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}!
+      0x555555559868: !\textcolor{pwndbgred}{0x81}! !\textcolor{pwndbgred}{0x00}! !\textcolor{pwndbgred}{0x00}! !\textcolor{pwndbgred}{0x00}! !\textcolor{pwndbgred}{0x00}! !\textcolor{pwndbgred}{0x00}! !\textcolor{pwndbgred}{0x00}! !\textcolor{pwndbgred}{0x00}!
+      0x555555559870: !\textcolor{pwndbgblue}{0x59}! !\textcolor{pwndbgblue}{0x55}! !\textcolor{pwndbgblue}{0x55}! !\textcolor{pwndbgblue}{0x55}! !\textcolor{pwndbgblue}{0x05}! !\textcolor{pwndbgblue}{0x00}! !\textcolor{pwndbgblue}{0x00}! !\textcolor{pwndbgblue}{0x00}!
+      0x555555559878: !\textcolor{pwndbgdarkgreen}{0x46}! !\textcolor{pwndbgdarkgreen}{0x46}! !\textcolor{pwndbgdarkgreen}{0x46}! !\textcolor{pwndbgdarkgreen}{0x46}! !\textcolor{pwndbgdarkgreen}{0x46}! !\textcolor{pwndbgdarkgreen}{0x46}! !\textcolor{pwndbgdarkgreen}{0x46}! !\textcolor{pwndbgdarkgreen}{0x46}!
+      0x555555559880: !\textcolor{pwndbgdarkgreen}{0x46}! !\textcolor{pwndbgdarkgreen}{0x46}! !\textcolor{pwndbgdarkgreen}{0x46}! !\textcolor{pwndbgdarkgreen}{0x46}! !\textcolor{pwndbgdarkgreen}{0x46}! !\textcolor{pwndbgdarkgreen}{0x46}! !\textcolor{pwndbgdarkgreen}{0x46}! !\textcolor{pwndbgdarkgreen}{0x46}!
+\end{pwndbg}
+
+Dans les fastbins, le \textit{safe-linking} est actif.
+
+Si l'on souhaite retrouver le \texttt{fd} réel, on peut manipuler la formule précedente
+$$
+      \begin{aligned}
+            \text{fd}_{\text{réel}} & = \text{fd}_{\text{encodé}} \oplus (\text{adresse}_{\text{chunk}} \gg 12) \\
+                                    & = (0x555555559) \oplus (0x5555555592a0 \gg 12)                            \\
+                                    & = 0
+      \end{aligned}
+$$
+
+ici on trouve 0 car le chunk est seul dans le fastbin
+
+
+\subsection{Smallbin}
+\begin{minted}[frame=single, framesep=2mm, fontsize=\footnotesize, style=monokai, bgcolor=pwndbgbg]{c}
+      oid *s_min = malloc(0x80), *g3 = malloc(0x30);
+      void *s_max = malloc(0x3e0), *g4 = malloc(0x30);
+      strcpy(s_max, "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS"); // S = 0x53
+      fill_tcache(0x80); fill_tcache(0x3e0);
+      free(s_min); free(s_max);
+\end{minted}
+
+
+voici à quoi ressemble s\_max une fois free:
+
+\begin{pwndbg}[x/40bx s\_max - 0x10]{text}
+      0x555555559e50: !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}!
+      0x555555559e58: !\textcolor{pwndbgred}{0xf1}! !\textcolor{pwndbgred}{0x03}! !\textcolor{pwndbgred}{0x00}! !\textcolor{pwndbgred}{0x00}! !\textcolor{pwndbgred}{0x00}! !\textcolor{pwndbgred}{0x00}! !\textcolor{pwndbgred}{0x00}! !\textcolor{pwndbgred}{0x00}!
+      0x555555559e60: !\textcolor{pwndbgblue}{0x80}! !\textcolor{pwndbgblue}{0x9d}! !\textcolor{pwndbgblue}{0x55}! !\textcolor{pwndbgblue}{0x55}! !\textcolor{pwndbgblue}{0x55}! !\textcolor{pwndbgblue}{0x55}! !\textcolor{pwndbgblue}{0x00}! !\textcolor{pwndbgblue}{0x00}!
+      0x555555559e68: !\textcolor{pwndbgyellow}{0x20}! !\textcolor{pwndbgyellow}{0x3b}! !\textcolor{pwndbgyellow}{0xe0}! !\textcolor{pwndbgyellow}{0xf7}! !\textcolor{pwndbgyellow}{0xff}! !\textcolor{pwndbgyellow}{0x7f}! !\textcolor{pwndbgyellow}{0x00}! !\textcolor{pwndbgyellow}{0x00}!
+      0x555555559e70: !\textcolor{pwndbgdarkgreen}{0x53}! !\textcolor{pwndbgdarkgreen}{0x53}! !\textcolor{pwndbgdarkgreen}{0x53}! !\textcolor{pwndbgdarkgreen}{0x53}! !\textcolor{pwndbgdarkgreen}{0x53}! !\textcolor{pwndbgdarkgreen}{0x53}! !\textcolor{pwndbgdarkgreen}{0x53}! !\textcolor{pwndbgdarkgreen}{0x53}!
+\end{pwndbg}
+
+
+Si l’on regarde l’état des bins, on s’attendrait à avoir un chunk dans l’unsortedbin
+(\texttt{s\_max}) et un dans le smallbin (\texttt{s\_min}), puisque \texttt{s\_max}
+est plus grand que \texttt{s\_min}. Cependant, ce n’est pas le cas, car un appel à
+\texttt{free} ne déclenche jamais le tri des chunks~: il effectue uniquement une éventuelle
+consolidation avec les chunks voisins.
+
+
+\begin{pwndbg}[bins]{text}
+      tcachebins
+      0x20 [  7]: 0x5555555599f0 -> .... <-0
+      0x50 [  1]: t1 <-0
+      0x80 [  7]: 0x555555559d10 -> ....  <-0
+      0x90 [  7]: 0x55555555a5f0 -> ....  <-0
+      0x110 [  1]: t2 <-0
+      0x3f0 [  7]: 0x55555555be20 -> .... <-0
+      0x410 [  1]: t3 <-0
+      fastbins
+      0x20: 0x555555559800 <-0
+      0x80: 0x555555559860 <-0
+      unsortedbin
+      all: s_max -> s_min -> 0x7ffff7e03b20 (main_arena+96) <- s_max
+      smallbins
+      empty
+      largebins
+      empty
+
+\end{pwndbg}
+
+
+
+\subsection{Largebin}
+\begin{minted}[frame=single, framesep=2mm, fontsize=\footnotesize, style=monokai, bgcolor=pwndbgbg]{c}
+    void *l_min = malloc(0x3f0);
+    fill_tcache(0x3f0);
+    strcpy(l_min, "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL"); // S = 4c
+    free(l_min);
+    malloc(0x410);
+\end{minted}
+
+Lors de l'allocation d'un grand chunk (largebin), l'allocateur parcours les différentes bins dans
+l'espoir de trouver deux chunk qu'il pourrait fussioner.
+tous les chunks parcourus sont ensuite directement trié et termine sois dans smallbin, sois dans
+le largebin.
+
+voici à quoi ressemble l\_min une fois free:
+
+\begin{pwndbg}[x/56bx l\_min - 0x10]{text}
+      0x55555555c200: !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}! !\textcolor{pwndbgbrown}{0x00}!
+      0x55555555c208: !\textcolor{pwndbgred}{0x01}! !\textcolor{pwndbgred}{0x04}! !\textcolor{pwndbgred}{0x00}! !\textcolor{pwndbgred}{0x00}! !\textcolor{pwndbgred}{0x00}! !\textcolor{pwndbgred}{0x00}! !\textcolor{pwndbgred}{0x00}! !\textcolor{pwndbgred}{0x00}!
+      0x55555555c210: !\textcolor{pwndbgblue}{0x10}! !\textcolor{pwndbgblue}{0x3f}! !\textcolor{pwndbgblue}{0xe0}! !\textcolor{pwndbgblue}{0xf7}! !\textcolor{pwndbgblue}{0xff}! !\textcolor{pwndbgblue}{0x7f}! !\textcolor{pwndbgblue}{0x00}! !\textcolor{pwndbgblue}{0x00}!
+      0x55555555c218: !\textcolor{pwndbgyellow}{0x10}! !\textcolor{pwndbgyellow}{0x3f}! !\textcolor{pwndbgyellow}{0xe0}! !\textcolor{pwndbgyellow}{0xf7}! !\textcolor{pwndbgyellow}{0xff}! !\textcolor{pwndbgyellow}{0x7f}! !\textcolor{pwndbgyellow}{0x00}! !\textcolor{pwndbgyellow}{0x00}!
+      0x55555555c220: !\textcolor{pwndbgpurple}{0x00}! !\textcolor{pwndbgpurple}{0xc2}! !\textcolor{pwndbgpurple}{0x55}! !\textcolor{pwndbgpurple}{0x55}! !\textcolor{pwndbgpurple}{0x55}! !\textcolor{pwndbgpurple}{0x55}! !\textcolor{pwndbgpurple}{0x00}! !\textcolor{pwndbgpurple}{0x00}!
+      0x55555555c228: !\textcolor{pwndbgorange}{0x00}! !\textcolor{pwndbgorange}{0xc2}! !\textcolor{pwndbgorange}{0x55}! !\textcolor{pwndbgorange}{0x55}! !\textcolor{pwndbgorange}{0x55}! !\textcolor{pwndbgorange}{0x55}! !\textcolor{pwndbgorange}{0x00}! !\textcolor{pwndbgorange}{0x00}!
+      0x55555555c230: !\textcolor{pwndbgdarkgreen}{0x4c}! !\textcolor{pwndbgdarkgreen}{0x4c}! !\textcolor{pwndbgdarkgreen}{0x4c}! !\textcolor{pwndbgdarkgreen}{0x4c}! !\textcolor{pwndbgdarkgreen}{0x4c}! !\textcolor{pwndbgdarkgreen}{0x4c}! !\textcolor{pwndbgdarkgreen}{0x4c}! !\textcolor{pwndbgdarkgreen}{0x4c}!
+\end{pwndbg}
+
+en regardant le pointeur (!\textcolor{pwndbgblue}[fd]) et le pointeur  (!\textcolor{pwndbgblue}[bk])
+on remaque qu'il pointe tous les deux vers 0x00007ffff7e03f10 qui corresponds à l'adresse
+de la main\_arena
+
+De plus on remarque que le pointeur next bk et next fd pointe sur lui même
+
+Chaque champ du chunk \texttt{l\_min} correspond exactement à la structure d’un largebin.
+Le champ \texttt{prev\_size} vaut \texttt{0x0} car le bit \texttt{PREV\_INUSE} est positionné dans
+le champ \texttt{size} (\texttt{0x401}, soit une taille réelle de \texttt{0x400}). Les pointeurs
+\texttt{fd} et \texttt{bk} pointent tous deux vers la tête du largebin, ce qui est normal pour un
+bin circulaire contenant un seul élément. Les champs \texttt{fd\_nextsize} et \texttt{bk\_nextsize}
+pointent vers le chunk lui-même, car il est le seul chunk de cette classe de taille. Enfin, le
+payload contient la valeur \texttt{0x4c} (caractère \texttt{'L'}), issue du \texttt{strcpy} effectué
+avant le \texttt{free}.
+

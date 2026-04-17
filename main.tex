@@ -1,0 +1,245 @@
+% =============================================================================
+% Exploitation of Heap Overflows in 2026
+% University Project Report
+% =============================================================================
+\documentclass[12pt, a4paper]{article}
+
+% --- Encoding & Language ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{amsmath}
+
+% --- Layout ---
+\usepackage[margin=1.5cm, headheight=16pt]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{parskip}
+\usepackage[moderate]{savetrees}
+
+% --- Typography & Fonts ---
+\usepackage{lmodern}
+\usepackage{amssymb}
+\usepackage{microtype}
+
+% --- Headers / Footers ---
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\leftmark}
+\fancyhead[R]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% --- Source Code (C, Python, shell) ---
+\usepackage{listings}
+\usepackage{xcolor}
+
+\definecolor{codebg}{HTML}{F5F5F5}
+\definecolor{codeframe}{HTML}{CCCCCC}
+\definecolor{codekw}{HTML}{0000CC}
+\definecolor{codecomment}{HTML}{008000}
+\definecolor{codestring}{HTML}{A31515}
+\definecolor{codenum}{HTML}{098658}
+
+\lstdefinestyle{cstyle}{
+    language=C,
+    backgroundcolor=\color{codebg},
+    frame=single,
+    rulecolor=\color{codeframe},
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{codekw}\bfseries,
+    commentstyle=\color{codecomment}\itshape,
+    stringstyle=\color{codestring},
+    numberstyle=\tiny\color{codenum},
+    numbers=left,
+    numbersep=8pt,
+    breaklines=true,
+    breakatwhitespace=false,
+    tabsize=4,
+    showstringspaces=false,
+    captionpos=b,
+    xleftmargin=1.5em,
+    framexleftmargin=1.5em,
+    columns=flexible,
+    morekeywords={size_t, uint64_t, uint8_t, intptr_t, uintptr_t, NULL, malloc_chunk},
+}
+
+\lstdefinestyle{pythonstyle}{
+    language=Python,
+    backgroundcolor=\color{codebg},
+    frame=single,
+    rulecolor=\color{codeframe},
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{codekw}\bfseries,
+    commentstyle=\color{codecomment}\itshape,
+    stringstyle=\color{codestring},
+    numberstyle=\tiny\color{codenum},
+    numbers=left,
+    numbersep=8pt,
+    breaklines=true,
+    tabsize=4,
+    showstringspaces=false,
+    captionpos=b,
+    xleftmargin=1.5em,
+    framexleftmargin=1.5em,
+    columns=flexible,
+}
+
+\lstdefinestyle{shellstyle}{
+    language=bash,
+    backgroundcolor=\color{codebg},
+    frame=single,
+    rulecolor=\color{codeframe},
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{codekw}\bfseries,
+    commentstyle=\color{codecomment}\itshape,
+    numbers=none,
+    breaklines=true,
+    tabsize=4,
+    showstringspaces=false,
+    captionpos=b,
+    xleftmargin=1.5em,
+    framexleftmargin=1.5em,
+    columns=flexible,
+}
+
+\lstset{style=cstyle}
+
+% --- Style pwndbg ---
+\usepackage[cachedir=.minted-cache]{minted}
+
+% 3. Charger tcolorbox
+\usepackage[breakable]{tcolorbox}
+\tcbuselibrary{minted, skins}
+%%%\usepackage{xcolor}
+
+% Terminal color palette
+% --- Couleurs déjà définies ---
+\definecolor{pwndbgbg}{HTML}{1E1E1E}
+\definecolor{pwndbgframe}{HTML}{2D2D2D}
+\definecolor{pwndbgred}{HTML}{E06C75}      % size
+\definecolor{pwndbgtext}{HTML}{ABB2BF}
+\definecolor{pwndbgblue}{HTML}{61AFEF}     % fd
+\definecolor{pwndbggreen}{HTML}{98C379}    % payload
+\definecolor{pwndbgdarkgreen}{HTML}{1B7F3A}    % old payload
+
+% --- Nouvelles couleurs pour ton code couleur ---
+\definecolor{pwndbgbrown}{HTML}{C19A6B}    % prev_size (brun)
+\definecolor{pwndbgpurple}{HTML}{C678DD}   % fd_nextsize (violet)
+\definecolor{pwndbgyellow}{HTML}{E5C07B}   % bk (jaune)
+\definecolor{pwndbgorange}{HTML}{D19A66}   % bk_nextsize (orange)
+
+
+
+% Usage: \begin{pwndbg}[title]{language} ... \end{pwndbg}
+%   #1 = optional title shown after "pwndbg>" in the header (default: empty)
+%   #2 = minted language: text, nasm, c, python, etc.
+%   Use |\textcolor{pwndbgblue}{...}| inside the body for inline color via escapeinside
+\newtcblisting{pwndbg}[2][]{%
+    listing engine=minted,
+    minted style=fruity,
+    minted language=#2,
+    minted options={fontsize=\footnotesize, breaklines, autogobble, escapeinside=!!},
+    colback=pwndbgbg,
+    colframe=pwndbgframe,
+    colupper=pwndbgtext,
+    boxrule=1.2pt,
+    arc=3pt,
+    left=6pt, right=4pt, top=4pt, bottom=4pt,
+    drop shadow=black!30!white,
+    title={\textcolor{pwndbgred}{\textbf{pwndbg>}} \texttt{#1}},
+    fonttitle=\bfseries\ttfamily\small,
+    coltitle=white,
+    colbacktitle=pwndbgframe,
+    listing only,
+    enhanced,
+    breakable=true,
+}
+
+% --- Images & Figures ---
+\usepackage{graphicx}
+\usepackage{float}
+\graphicspath{{./images/}}
+
+% --- Tables ---
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+
+% --- Hyperlinks ---
+\usepackage[
+    colorlinks=true,
+    linkcolor=blue!60!black,
+    citecolor=green!40!black,
+    urlcolor=blue!70!black,
+]{hyperref}
+
+% --- Bibliography ---
+\usepackage[nottoc]{tocbibind}
+
+% --- Misc ---
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{tikz}
+\usetikzlibrary{calc,positioning,arrows.meta,decorations.pathreplacing}
+
+% --- TODO command for empty sections ---
+\newcommand{\todo}[1]{\textcolor{red!70!black}{\textbf{[TODO: #1]}}}
+\newcommand{\fillhere}{\todo{Write this section}}
+
+
+\newcommand{\vp}{\vspace{11pt}}
+
+% ------- Biblio ----------
+\usepackage[
+    backend=biber,
+    style=alphabetic,
+    sorting=none
+]{biblatex}
+
+\addbibresource{refs-doc.bib}
+
+
+
+% Décommente la ligne suivante pour ne compiler QUE la section en cours
+% \includeonly{sections/01_rappels}
+% \includeonly{sections/02_malloc}
+% \includeonly{sections/03_analyse}
+% \includeonly{sections/04_exploitation1}
+% \includeonly{sections/04_exploitation2}
+% \includeonly{sections/04_exploitation3}
+% \includeonly{sections/04_exploitation4}
+% \includeonly{sections/04_exploitation5}
+% \includeonly{sections/05_biblio}
+
+% =============================================================================
+\begin{document}
+
+% --- Title ---
+\title{
+    \includegraphics[width=0.4\textwidth]{logo_univ_bdx.png}\\[1.5cm]
+    \textbf{Exploitation des Heap Overflows en 2026}
+}
+\author{Arnaud Gomes \& Kamiel De Vos \\ Université de Bordeaux}
+\date{\today}
+\maketitle
+\thispagestyle{empty}
+\newpage
+
+% --- Table of Contents ---
+\tableofcontents
+\newpage
+
+\input{sections/01_rappels}
+\input{sections/02_malloc}
+\input{sections/03_analyse}
+\input{sections/04_exploitation1}
+\input{sections/04_exploitation2}
+\input{sections/04_exploitation3}
+\input{sections/04_exploitation4}
+\input{sections/04_exploitation5}
+\input{sections/05_biblio}
+
+
+\end{document}

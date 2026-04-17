@@ -1,0 +1,245 @@
+% =============================================================================
+% CHAPTER II - MALLOC 
+% =============================================================================
+\section{Malloc}
+
+% -----------------------------------------------------------------------------
+\subsection{Comment fonctionne \texttt{malloc}}
+
+\texttt{malloc} est une fonction de la bibliothèque standard C chargée d'allouer de la mémoire dynamique dans le tas (heap).
+Le code source de \texttt{malloc} est disponible dans \texttt{glibc}, accessible sur le site \url{https://sourceware.org}.
+
+\vp
+
+Lorsque vous appelez \texttt{malloc(num)}, vous demandez au système d'exploitation
+de réserver une zone mémoire dans l'espace du processus, plus précisément dans la
+région dédiée au tas.
+L'argument passé à \texttt{malloc} correspond au nombre d'octets souhaités.
+
+En pratique, l'appel à \texttt{malloc} est géré par l'allocateur \texttt{ptmalloc2}.
+Cet allocateur est le gestionnaire mémoire utilisé par \texttt{glibc} pour les
+programmes C. Lorsqu'un programme a besoin de mémoire, il invoque
+\texttt{malloc()}, et lorsqu'il n'en a plus besoin, il appelle \texttt{free()}
+pour libérer l'espace.
+
+En arrière‑plan, \texttt{ptmalloc2} obtient de grands blocs de mémoire auprès
+du noyau via des appels système tels que \texttt{brk()} (pour étendre la zone
+principale du tas) ou \texttt{mmap()} (pour les allocations de grande taille).
+Pour optimiser les performances, \texttt{ptmalloc2} ne renvoie pas immédiatement
+la mémoire libérée au système lors d'un appel à \texttt{free()}.
+À la place, il conserve les blocs libérés dans des structures internes
+(comme les \emph{bins} et le \emph{tcache}), ce qui lui permet de réattribuer
+rapidement ces blocs lors d'un prochain appel à \texttt{malloc()}.
+
+Ce mécanisme de réutilisation efficace constitue également une surface d'attaque
+privilégiée pour les exploitations de vulnérabilités liées au tas.
+
+\texttt{malloc} a également la possibilité de scinder un chunk lorsqu’il est plus grand
+que la taille demandée. Dans ce cas, l’allocateur découpe le chunk trouvé en deux~:
+il construit un premier chunk de la taille requise, qui est retourné à l’utilisateur,
+puis place le chunk restant dans l’unsorted~bin afin qu’il puisse être réutilisé
+ultérieurement.
+
+
+% ----------------------------------------------------------------------------- 
+\subsection{Anatomie d'un Chunk}
+
+La mémoire gérée par l'allocateur est divisée en blocs appelés « chunks ». Un chunk stocke les données de l'utilisateur, mais intègre également des métadonnées internes indispensables à \texttt{ptmalloc2}. La structure physique de ce bloc change radicalement selon qu'il est alloué ou libre.
+
+Pour prouver ce comportement dynamique, nous utilisons le code de démonstration suivant :
+
+\vp
+
+\begin{minted}[frame=single, framesep=2mm, fontsize=\footnotesize, style=monokai, bgcolor=pwndbgbg]{c}
+#include <stdlib.h>
+#include <string.h>
+
+int main() {
+    // Allocation de 0x30 octets. La GLIBC ajoute un en-tête de 0x10 octets.
+    // La taille physique réelle du chunk sera de 0x40 octets.
+    char *chunk_a = malloc(0x30);
+    strcpy(chunk_a, "AAAA"); // Remplissage avec des données utilisateur
+    /* --- [BREAKPOINT 1 : Chunk Alloué] --- */
+    free(chunk_a);
+    /* --- [BREAKPOINT 2 : Chunk Libéré (Tcache)] --- */
+    
+    return 0;
+}
+\end{minted}
+
+\subsubsection{Structure d'un Chunk Alloué}
+
+Lorsqu'un chunk est en cours d'utilisation, l'allocateur se contente de stocker sa taille dans l'en-tête. Le reste de l'espace est purement dédié à l'utilisateur. En raison des contraintes d'alignement matériel (16 octets sur les architectures 64 bits), la taille minimale absolue d'un chunk est de 32 octets. Toute demande est automatiquement arrondie au multiple de 16 supérieur.
+
+Si nous observons la mémoire au \textbf{breakpoint 1}, nous constatons que l'en-tête contient la taille (\texttt{0x41}, soit 0x40 + le bit \texttt{PREV\_INUSE}), immédiatement suivie de notre chaîne de caractères « AAAA » (\texttt{0x41414141}).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{malloc_chunk_layout.png}
+    \caption{Structure d'un chunk alloué}
+    \label{fig:malloc_chunk_layout}
+\end{figure}
+
+\begin{pwndbg}[x/4gx chunk\_a - 0x10]{text}
+    0x555555559290: 0x0000000000000000 !\textcolor{pwndbgred}{0x0000000000000041}!
+    0x5555555592a0: !\textcolor{pwndbgtext}{0x0000000041414141}! 0x0000000000000000
+\end{pwndbg}
+
+
+\subsubsection{Structure d'un Chunk Libéré}
+
+Au moment du \texttt{free()}, les données utilisateur n'ont plus d'utilité. L'allocateur recycle instantanément cet espace pour y injecter des pointeurs de gestion, ce qui permet d'insérer le bloc dans une liste d'attente (les « bins »).
+
+Le premier pointeur inséré (\texttt{fd} pour \textit{forward}) indique l'adresse du prochain bloc libre. Dans les attaques modernes ciblant le Tcache, tout l'enjeu est d'utiliser une vulnérabilité (comme un \textit{Use-After-Free}) pour corrompre ce pointeur \texttt{fd} et détourner la liste chaînée vers une adresse arbitraire. Les chunks très volumineux (\texttt{largebins}) possèdent des pointeurs supplémentaires (\texttt{fd\_nextsize}), mais ces champs n'existent pas dans les petites structures.
+
+Si nous observons la mémoire au \textbf{breakpoint 2}, nous voyons que nos données utilisateur (« AAAA ») ont été écrasées par les métadonnées de la GLIBC :
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{free_chunk_layout.png}
+    \caption{Structure d'un chunk libéré}
+    \label{fig:free_chunk_layout}
+\end{figure}
+
+\begin{pwndbg}[x/4gx chunk\_a - 0x10]{text}
+    0x555555559290: 0x0000000000000000 !\textcolor{pwndbgred}{0x0000000000000041}!
+    0x5555555592a0: !\textcolor{pwndbgblue}{0x0000000555555559}! !\textcolor{pwndbggreen}{0xafc0e29aec2de325}!
+\end{pwndbg}
+
+\paragraph{Différence de métadonnées : Tcache vs Fastbin}
+Comme illustré ci-dessus, la GLIBC écrit deux valeurs lorsqu'un chunk atterrit dans le Tcache : le pointeur \texttt{fd} (\textcolor{pwndbgblue}{Bleu}, protégé par le \textit{Safe Linking}) et la \texttt{key} anti-double-free (\textcolor{pwndbggreen}{Vert}).
+
+Il est crucial de noter que si le chunk est dirigé vers un Fastbin, \textbf{le pointeur \texttt{key} n'est jamais instancié}. Les Fastbins ne s'appuient que sur le pointeur \texttt{fd}, limitant leur protection anti-double-free à une simple vérification du sommet de la liste.
+
+% ----------------------------------------------------------------------------- 
+\subsection{Bins et Mécanismes de Recyclage}
+
+Lorsque l'espace est libéré, l'allocateur doit le ranger intelligemment pour répondre rapidement aux futures requêtes \texttt{malloc}. La GLIBC utilise une hiérarchie stricte de listes (les bins), de la plus rapide (mais moins sécurisée) à la plus complexe.
+
+\subsubsection{Tcache --- Thread-local Cache}
+
+Introduit pour accélérer drastiquement les allocations multithreads,
+le Tcache intercepte l’ensemble des chunks dont la taille est inférieure à 0x410,
+c’est‑à‑dire tous ceux plus petits que le largebin, à l’exception de la première classe.
+Il est ainsi devenu la surface d’attaque numéro un.
+
+Il s’agit d’une liste simplement chaînée fonctionnant en LIFO (Last-In, First-Out),
+capable de stocker jusqu’à 7 chunks par index de taille.
+Il peut y avoir jusqu’à 64 listes de chunks.
+Son fonctionnement correspond exactement au dump mémoire analysé précédemment,
+et il est défini formellement par la structure interne suivante :
+
+\begin{minted}[frame=single, framesep=2mm, fontsize=\footnotesize, style=monokai, bgcolor=pwndbgbg]{c}
+// Structure interne d'une entrée Tcache (glibc 2.41)
+typedef struct tcache_entry { 
+    struct tcache_entry *next;           /* Pointeur obfusqué (Safe Linking) */ 
+    struct tcache_perthread_struct *key; /* Clé anti-double-free */ 
+} tcache_entry; 
+\end{minted}
+
+\subsubsection{Bins}
+
+Il existe quatre types de bins :
+\begin{itemize}
+    \item \textbf{Fastbins} $\rightarrow$ listes simplement chaînées
+    \item \textbf{Smallbins} $\rightarrow$ listes doublement chaînées
+    \item \textbf{Largebins} $\rightarrow$ listes doublement chaînées
+    \item \textbf{Unsorted bin} $\rightarrow$ liste doublement chaînée
+\end{itemize}
+
+La principale différence entre ces bins (à l'exception de l'unsorted bin) réside dans la
+plage de tailles des chunks qu'ils contiennent.
+Ces tailles changent en fonction de la version de la glibc.
+Les chiffres donnés après sont valables à partir de la version 2.26 (2017).
+
+\noindent Les fastbins ne réalisent pas de \textit{consolidation}, contrairement aux smallbins et largebins.
+
+\textbf{La consolidation} intervient à deux moments depuis glibc~2.27.
+Elle peut se produire lors de la libération d’un chunk, ou lors de
+l’allocation d’un chunk de grande taille (supérieur à \texttt{0x3f0}),
+ce qui force l’allocateur à appeler \texttt{malloc\_consolidate}.
+Cette fonction examine alors les chunks adjacents en mémoire et fusionne
+ceux qui sont libres et ne se trouvent pas dans le tcache. Le chunk
+résultant est placé dans l’unsorted~bin lorsqu’il provient d’un
+\texttt{free}, ou directement rangé dans le bin approprié lorsqu’il est
+créé au cours d’une allocation de grande taille.
+
+
+L'ordre de recherche dans les bins est le suivant :
+
+
+\[
+    \texttt{tcache} \rightarrow \texttt{fastbins} \rightarrow \texttt{unsorted bin} \rightarrow \texttt{smallbins} \rightarrow \texttt{largebins}.
+\]
+
+
+
+\vp
+
+\noindent\textbf{Unsorted Bin}\\
+L'unsorted bin est une structure \textbf{FIFO}.
+Les chunks y sont placés lorsqu'ils sont libérés et qu'ils ne vont ni dans le tcache
+ni dans les fastbins, ou lorsque le tcache est plein ou que la taille du chunk dépasse
+la limite du tcache (\texttt{0x410}).
+Les nouveaux chunks sont insérés en tête de liste.
+
+Lors d'une allocation, l'unsorted bin est parcouru après le tcache et les fastbins.
+Il est traversé du plus ancien au plus récent : le chunk le plus récemment libéré est
+donc vérifié en dernier.
+Si un chunk de taille compatible est trouvé, il est immédiatement retourné.
+Les chunks qui ne correspondent pas à la taille demandée sont réinsérés dans leur
+smallbin ou largebin respectif.
+
+\vp
+
+\noindent\textbf{Fastbins}\\
+Les fastbins sont des structures \textbf{LIFO}.
+Ils contiennent des chunks de taille comprise entre \texttt{0x20} et \texttt{0x80},
+répartis en 7 classes espacées de \texttt{0x10}.
+Aucune recherche n'est nécessaire, les fastbins sont déjà triés par taille, et
+l'allocation consiste simplement à retirer le chunk en tête de liste.
+De plus, un chunk n'entre dans un fastbin que par le biais d'un \texttt{free()}.
+Autrement dit, lorsqu'une consolidation se produit, le chunk résultant ne peut plus
+retourner dans le fastbin ; il est redirigé vers l'unsorted bin ou un smallbin.
+
+\vp
+
+\noindent\textbf{Smallbins}\\
+Les smallbins sont des structures \textbf{FIFO} contenant des chunks de taille comprise
+entre \texttt{0x90} et \texttt{0x3f0}, espacés de \texttt{0x10}.
+Un chunk n'est ajouté à un smallbin qu'après être passé par l'unsorted bin.
+Lors de son insertion, le premier quadword de la zone utilisateur est réutilisé comme
+pointeur avant (\texttt{fd}) et le second comme pointeur arrière (\texttt{bk}).
+
+\vp
+
+\noindent\textbf{Largebins}\\
+Les largebins sont également \textbf{FIFO} et contiennent des chunks de taille comprise
+entre \texttt{0x400} et le seuil \texttt{mmap} (par défaut \texttt{0x20000}, soit 128~Ko).
+Au-delà de ce seuil, \texttt{malloc()} contourne entièrement les bins et demande
+directement une page anonyme au noyau via \texttt{mmap()}.
+Les largebins sont répartis en 63 bins, chacun couvrant une plage de tailles.
+
+Par exemple, le largebin \texttt{0x400} contient les chunks de \texttt{0x400} à
+\texttt{0x430}, tandis que le largebin \texttt{0x2000} contient ceux de
+\texttt{0x2000} à \texttt{0x21f0}.
+
+À l'intérieur d'un largebin, les chunks sont triés par taille décroissante :
+le plus grand est accessible via \texttt{fd}, le plus petit via \texttt{bk}.
+Lors de l'insertion, le premier quadword utilisateur est utilisé comme \texttt{fd},
+le second comme \texttt{bk}.
+
+Les largebins maintiennent également une structure secondaire appelée \textit{nextsize},
+qui relie entre eux les premiers chunks de chaque taille distincte dans un même bin.
+Le chunk « skip‑list » d'une taille donnée utilise ses troisième et quatrième quadwords
+comme \texttt{fd\_nextsize} et \texttt{bk\_nextsize}.
+Les chunks supplémentaires de même taille sont insérés après ce chunk spécial, ce qui
+évite de modifier les pointeurs nextsize.
+
+Un exemple d'utilisation de \texttt{bk\_nextsize} apparaît lorsque \texttt{malloc()}
+recherche un chunk légèrement plus petit après avoir échoué à trouver une correspondance
+exacte.
+Si la taille demandée est \texttt{0x2100} et que le largebin contient des chunks de
+\texttt{0x2400}, \texttt{0x2200} et \texttt{0x2000}, \texttt{malloc()} peut suivre
+\texttt{bk\_nextsize} depuis le chunk \texttt{0x2400} pour atteindre rapidement
+\texttt{0x2200}, sans parcourir linéairement tout le bin.

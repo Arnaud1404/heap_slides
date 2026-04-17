@@ -1,0 +1,30 @@
+\section{Perspectives : L'évolution de l'allocateur (GLIBC 2.42 \& 2.43)}
+L'adoption des protections introduites dans les versions \texttt{2.42} et \texttt{2.43} de la \texttt{glibc} est liée au cycle de mise à jour des distributions Linux. La GLIBC n'est que rarement mise à jour de manière isolée, son déploiement suivant généralement le passage à une nouvelle version majeure du système d'exploitation.
+
+Actuellement, ces versions "Bleeding Edge" sont principalement disponibles sur les distributions de type \textit{rolling release} (Arch Linux) ou les versions de développement (Debian Sid, Fedora Rawhide, Ubuntu 26.04). L'analyse de ces mécanismes impose souvent l'usage d'environnements conteneurisés ou de machines virtuelles, car les parcs serveurs en production (LTS) conservent des versions plus anciennes pour garantir la stabilité.
+\subsection*{GLIBC 2.42 : Durcissement (Août 2025)}
+La version 2.42 impose que des pointeurs \texttt{fd\_nextsize} et \texttt{bk\_nextsize} soient cohérents dans les deux sens, lors de l'insertion dans l'\textit{Unsorted Bin} et les \textit{Largebins} :
+\[ P\rightarrow\texttt{fd\_nextsize}\rightarrow\texttt{bk\_nextsize} == P \]
+Toute asymétrie déclenche une erreur, bloquant l'écriture arbitraire des \textit{Large Bin Attacks}.
+
+\subsection*{GLIBC 2.43 : Refonte et suppression des Fastbins (Janvier 2026)}
+La version 2.43 supprime la structure \texttt{fastbin}. Les petites allocations sont désormais gérées par le \textit{Tcache} et les \textit{Smallbins}. De plus, le \textit{Safe Linking} ($P \oplus (L \gg 12)$) s'applique désormais à l'ensemble des listes chaînées simples de l'allocateur.
+
+\section{Bibliographie}
+
+\nocite{*}
+
+\defbibenvironment{bibliography}
+  {\list
+     {}
+     {\setlength{\leftmargin}{\bibhang}%
+      \setlength{\itemindent}{-\leftmargin}%
+      \setlength{\itemsep}{\bibitemsep}%
+      \setlength{\parsep}{\bibparsep}}}
+  {\endlist}
+  {\item}
+
+\printbibliography[keyword=video, heading=subbibliography, title={Vidéos}]
+\printbibliography[keyword=git, heading=subbibliography, title={Dépôts Git / Ressources techniques}]
+\printbibliography[keyword=web, heading=subbibliography, title={Sites Web / Articles en ligne}]
+\printbibliography[keyword=thesis, heading=subbibliography, title={Mémoires universitaires}]
