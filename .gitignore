@@ -1,16 +1,14 @@
-# LaTeX
-*.aux
-*.log
-*.out
-*.toc
-*.nav
-*.snm
-*.vrb
-*.pdf
-*.gz
-*.fdb_latexmk
-*.fls
+# Ignore everything by default
+/*
 
-# Minted (Coloration syntaxique)
-_minted-*
-*.pyg
+# Keep this file tracked
+!/.gitignore
+
+# Keep the LaTeX sources
+!/*.tex
+
+# Keep the content folders
+!/images/
+!/images/**
+!/sections/
+!/sections/**
