@@ -10,6 +10,9 @@
 # Keep markdowns
 !/*.md
 
+# Keep bibliography
+!/*.bib
+
 # Keep the content folders
 !/images/
 !/images/**
