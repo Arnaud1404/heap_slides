@@ -108,12 +108,32 @@
 \section{Introduction et Fondamentaux (4 min)}
 
 \begin{frame}{Objectif}
+
+    \begin{itemize}
+        \item Fonctionnement de malloc (glibc 2.26 à 2.41)
+        \item Techniques d'exploitation
+    \end{itemize}
+
 \end{frame}
 
+
 \begin{frame}{ptmalloc2}
+
+    brk()
+
 \end{frame}
 
 \begin{frame}{Chunk}
+
+    \includegraphics{images/malloc_chunk_layout.png}
+
+\end{frame}
+
+\begin{frame}{Dans un processus}
+
+    pas de heap utilisateurs
+    brk()
+
 \end{frame}
 
 \section{Le Cœur : 1 Type d'Exploit = 1 Primitive (12 min)}
