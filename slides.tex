@@ -40,7 +40,7 @@
 
 % --- TikZ ---
 \usepackage{tikz}
-\usetikzlibrary{calc,positioning,arrows.meta,decorations.pathreplacing,shadows}
+\usetikzlibrary{calc,positioning,arrows.meta,decorations.pathreplacing,shadows,matrix}
 
 % --- Couleurs personnalisées ---
 \usepackage{xcolor}
@@ -183,10 +183,115 @@
 
 
 \begin{frame}{C'est quoi malloc}
-    \centering
-    \includegraphics[width=\textwidth]{images/malloc_chunk_layout.png}
+
+    \begin{minipage}{0.40\textwidth}
+        \begin{tikzpicture}[
+                cell/.style={
+                        rectangle, draw=black, thick,
+                        minimum width=2.5cm,
+                        minimum height=8mm,
+                        align=center
+                    }
+            ]
+
+            % Hauteur d'une ligne
+            \def\chunkh{5mm}
+
+            % Ligne 1
+            \node[cell, anchor=west, fill=chunkPrevSize!20] (prev) at (0,0) {prev\_size};
+            \node[cell, anchor=west, fill=chunkSize!20] (size) at ([xshift=0mm]prev.east) {size};
+
+            % Ligne 2 (payload)
+            \node[cell, anchor=west, fill=chunkPayload!20, minimum width=5cm]
+            (payload) at ($(prev.south west)+(0,-\chunkh)$) {payload};
+
+            % Titre centré
+            \node[above=0.4cm,font=\bfseries] at ($(prev)!0.5!(size)$) {Chunk alloué};
+
+        \end{tikzpicture}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.50\textwidth}
+        \textbf{Signification des champs :}
+
+        \vspace{2mm}
+
+        \begin{itemize}
+            \item \textbf{prev\_size} : taille du chunk précédent (si libre)
+            \item \textbf{size} : taille du chunk courant + flags
+            \item \textbf{payload} : zone utilisateur et pointeur retourné par malloc
+        \end{itemize}
+    \end{minipage}
+
 \end{frame}
 
+
+
+
+\begin{frame}{C'est quoi malloc}
+
+    \begin{minipage}{0.40\textwidth}
+        \begin{tikzpicture}[
+                cell/.style={
+                        rectangle, draw=black, thick,
+                        minimum width=2.5cm,
+                        minimum height=8mm,
+                        align=center
+                    }
+            ]
+
+            \def\chunkh{5mm}
+
+            % Ligne 1
+            \node[cell, anchor=west, fill=chunkPrevSize!20] (prev) at (0,0) {prev\_size};
+            \node[cell, anchor=west, fill=chunkSize!20] (size) at ([xshift=0mm]prev.east) {size};
+
+            % Ligne 2
+            \node[cell, anchor=west, fill=chunkFd!20]
+            (fd) at ($(prev.south west)+(0,-\chunkh)$) {fd};
+            \node[cell, anchor=west, fill=chunkBk!20]
+            (bk) at ([xshift=0mm]fd.east) {bk};
+
+            % Ligne 3
+            \node[cell, anchor=west, fill=chunkFdNext!20]
+            (fdn) at ($(fd.south west)+(0,-\chunkh)$) {fd\_nextsize};
+            \node[cell, anchor=west, fill=chunkBkNext!20]
+            (bkn) at ([xshift=0mm]fdn.east) {bk\_nextsize};
+
+            % Ligne 4 (payload)
+            \node[cell, anchor=west, fill=chunkPayload!20, minimum width=5cm]
+            (payload) at ($(fdn.south west)+(0,-\chunkh)$) {payload};
+
+            % Titre centré
+            \node[above=0.4cm,font=\bfseries] at ($(prev)!0.5!(size)$) {Chunk libre};
+
+        \end{tikzpicture}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.50\textwidth}
+
+        \textbf{Champs supplémentaires dans un chunk libre :}
+
+        \vspace{2mm}
+
+        \begin{itemize}
+            \item \textbf{fd} : pointeur vers le prochain chunk libre
+                  dans la même bin
+
+            \item \textbf{bk} : pointeur vers le chunk libre précédent
+                  dans la même bin
+
+            \item \textbf{fd\_nextsize} : pointeur vers le prochain chunk
+                  \emph{de même taille}
+
+            \item \textbf{bk\_nextsize} : pointeur vers le chunk précédent
+                  \emph{de même taille}
+
+        \end{itemize}
+
+    \end{minipage}
+
+\end{frame}
 
 
 
