@@ -74,6 +74,7 @@
 \definecolor{pwndbgtext}{HTML}{000000}  % Noir pur
 \definecolor{pwndbgblue}{HTML}{0184BC}
 \definecolor{pwndbggreen}{HTML}{50A14F}
+\definecolor{pwndbgbrown}{HTML}{A52A2A}
 
 \newtcblisting{pwndbg}[2][]{%
     listing engine=minted,
@@ -101,6 +102,12 @@
 \institute{Université de Bordeaux}
 \date{21 avril 2026}
 
+\addtobeamertemplate{frametitle}{}{%
+    \begin{tikzpicture}[remember picture,overlay]
+        \node[anchor=north east, yshift=0.1625cm, xshift=0.25cm] at (current page.north east) {\includegraphics[height=1cm]{images/logo_univ_bdx.png}};
+    \end{tikzpicture}
+}
+
 \begin{document}
 
 \begin{frame}
@@ -120,23 +127,67 @@
 
 \section{Le Cœur : 1 Type d'Exploit = 1 Primitive (12 min)}
 
-\begin{frame}[fragile]{Use-After-Free (UAF) \& Safe Linking}
-    \textbf{Vulnérabilité \& Primitive}
-    \begin{itemize}
-        \item \textbf{UAF} : accès pointeur post-libération.
-        \item \textbf{Tcache Poisoning} : corruption pointeur de chaînage \texttt{fd}.
-        \item Objectif final : point d'écriture arbitraire via \texttt{malloc()}.
-    \end{itemize}
-    \vspace{-0.5em}
+\begin{frame}[fragile]{Use-After-Free (UAF) \& Safe Linking (1/3)}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \textbf{Vulnérabilité} : \textit{Use-After-Free}
+            \begin{itemize}
+                \item \textbf{Objectif} : Détourner la liste (Tcache).
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \textbf{Conséquence globale}
+            \begin{itemize}
+                \item \textit{Arbitrary Write} via \texttt{malloc}.
+            \end{itemize}
+        \end{column}
+    \end{columns}
+    \vspace{-1.5em}
     
+    \begin{ccode}
+long *a = malloc(0x20); free(a); // 'a' dans Tcache
+*a = 0xdeadbeef;                 // UAF : fd corrompu !
+malloc(0x20);                    // Dépile 'a'
+long *target = malloc(0x20);     // Ciblera 0xdeadbeef !
+    \end{ccode}
+    \vspace{-1.5em}
+
+    \begin{pwndbg}[tcachebins]{text}
+tcachebins
+  0x20 [  2]: 0x5...010 @\textcolor{pwndbgblue}{->}@ @\textcolor{pwndbgred}{0xdeadbeef}@
+    \end{pwndbg}
+\end{frame}
+
+\begin{frame}[fragile]{Use-After-Free (UAF) \& Safe Linking (2/3)}
     \textbf{Mitigation : Safe Linking (GLIBC 2.32+)}
     \begin{itemize}
-        \item Masquage cryptographique \textit{freelist} : $C = (L \gg 12) \oplus P$.
-        \item $L$ : Adresse mémoire stockant le pointeur (\textit{Location}). \\ $P$ : Pointeur cible.
-        \item Fin des attaques aveugles $\rightarrow$ nécessité de \textit{heap leak}.
+        \item Masquage cryptographique du Tcache Poisoning aveugle.
     \end{itemize}
-    \vspace{-0.5em}
+    \vspace{0.1em}
+    
+    \begin{columns}[T]
+        \begin{column}{0.50\textwidth}
+            \textbf{Formule algorithmique}
+            \begin{itemize}
+                 \item $C = (L \gg 12) \oplus P$
+                 \item $L$ : L'adresse stockant le pointeur.
+                 \item $P$ : Le vrai pointeur ciblé.
+                 \item $C$ : Valeur stockée en RAM.
+            \end{itemize}
+        \end{column}
+        
+        \begin{column}{0.46\textwidth}
+            \textbf{L'impact sur l'attaquant}
+            \begin{itemize}
+                \item Forcer un pointeur provoque un crash (\texttt{SIGSEGV}).
+                \item Protège les allocations.
+                \item \textbf{Nécessite} : Un \textit{Heap Leak}.
+            \end{itemize}
+        \end{column}
+    \end{columns}
+\end{frame}
 
+\begin{frame}[fragile]{Use-After-Free (UAF) \& Safe Linking (3/3)}
     \textbf{Inversion algorithmique (XOR-shift)}
     \vspace{-0.5em}
     \begin{center}
@@ -191,32 +242,113 @@
     \end{center}
 \end{frame}
 
-\begin{frame}[fragile]{Double Free}
-    \textbf{Vulnérabilité \& Primitive}
-    \begin{itemize}
-        \item \textbf{Fastbin Dup} : double libération contournant le LIFO simple (\texttt{free($A \rightarrow B \rightarrow A$)}).
-        \item Permet d'ignorer la vérification anti-double-free (\texttt{key}) du Tcache.
-        \item \textbf{Résultat} : liste circulaire (boucle pour écriture arbitraire).
-    \end{itemize}
-    \vspace{-0.2em}
+\begin{frame}[fragile]{Double Free : Fastbin Dup}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \textbf{Vulnérabilité}
+            \begin{itemize}
+                \item \texttt{free($A \rightarrow B \rightarrow A$)} en Fastbins.
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \textbf{Conséquence}
+            \begin{itemize}
+                \item Boucle pour Arbitrary Write.
+            \end{itemize}
+        \end{column}
+    \end{columns}
+    \vspace{-1.5em}
 
     \begin{ccode}
-long *a = calloc(1, 0x20); long *b = calloc(1, 0x20);
+long *a = calloc(0x20); long *b = calloc(0x20);
 free(a); free(b); free(a);
 
-long *c = calloc(1, 0x20); // Retourne bloc A
-long *d = calloc(1, 0x20); // Retourne bloc B
-long *e = calloc(1, 0x20); // Retourne bloc A !
+long *c = calloc(0x20); // Bloc A
+long *d = calloc(0x20); // Bloc B
+long *e = calloc(0x20); // Bloc A ! (Contrôle zone c)
     \end{ccode}
-    \vspace{-0.2em}
+    \vspace{-1.5em}
 
     \begin{pwndbg}[bins]{text}
 fastbins
-  0x20: 0x5555555593e0 @\textcolor{pwndbgblue}{->}@ 0x555555559400 @\textcolor{pwndbgblue}{<-}@ @\textcolor{pwndbgred}{0x5555555593e0 (loop)}@
+  0x20: 0x5...93e0 @\textcolor{pwndbgblue}{->}@ 0x5...9400 @\textcolor{pwndbgblue}{<-}@ @\textcolor{pwndbgred}{0x5...93e0 (loop)}@
     \end{pwndbg}
 \end{frame}
 
-\begin{frame}{Heap Overflow}
+\begin{frame}[fragile]{Heap Overflow \& Overlapping}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \textbf{Mécanisme} (Cible : \texttt{size})
+            \begin{itemize}
+                \item Extension d'un chunk vers un autre.
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \textbf{Conséquence} (\textit{Aliasing})
+            \begin{itemize}
+                \item Effacement de données adjacentes.
+            \end{itemize}
+        \end{column}
+    \end{columns}
+    \vspace{-1.5em}
+    
+    \begin{ccode}
+long *p1 = malloc(0x80-8); long *p2 = malloc(0x500-8);
+long *p3 = malloc(0x80-8); malloc(0x10); // guard
+
+*(p2 - 1) = 0x581; // OVERFLOW (size altée)
+free(p2); // p2 dans l'Unsorted Bin avec fausse taille
+
+long *p4 = malloc(0x580 - 8); // Chevauche p3 !
+memset(p4, '4', 0x580 - 8);   // Écrase p3 en silence
+    \end{ccode}
+    \vspace{-1.5em}
+
+    \begin{pwndbg}[heap]{text}
+0x5...000 0x...081 (p1)
+0x5...080 @\textcolor{pwndbgred}{0x0...581}@ (p2 corrompu, taille \textit{fake} 0x580)
+0x5...580 0x0...081 (p3 originel non modifié)
+...       
+0x5...600 0x3434343434343434 (p4 et p3 tapent ici !)
+    \end{pwndbg}
+\end{frame}
+
+\begin{frame}[fragile]{Exploitation Applicative : Type Confusion}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \textbf{Le Pivot Applicatif}
+            \begin{itemize}
+                \item GLIBC ignorée, Cible : Logique interne du programme.
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \textbf{Invisibilité système}
+            \begin{itemize}
+                \item Aucune sécurité métadonnée (\textit{Safe Linking}) déclenchée.
+            \end{itemize}
+        \end{column}
+    \end{columns}
+    \vspace{-2.0em}
+    
+    \begin{ccode}
+typedef struct { void (*execute)(); } task_t; // 8 octets
+typedef struct { char content[8]; } msg_t;    // 8 octets
+
+task_t *task = malloc(sizeof(task_t)); task->execute = lose;
+free(task); // UAF: dangling pointer !
+
+msg_t *msg = malloc(sizeof(msg_t)); // Allocation même taille
+*(long *)msg->content = (long)win;  // Type Confusion
+
+task->execute(); // Exécute win() !
+    \end{ccode}
+    \vspace{-2.0em}
+
+    \begin{pwndbg}[stack]{text}
+00:0000| rsp 0x7ffd...440 {a} @\textcolor{pwndbgblue}{->}@ 0x7ffd...460 {fake\_chunks+0x10}
+...
+01:0008|     0x7ffd...448 {b} @\textcolor{pwndbgblue}{->}@ 0x7ffd...460 {fake\_chunks+0x10}
+    \end{pwndbg}
 \end{frame}
 
 \begin{frame}{Largebin}
@@ -227,10 +359,42 @@ fastbins
 \begin{frame}{ASLR}
 \end{frame}
 
-\begin{frame}{GLIBC 2.42 / 2.43}
+\begin{frame}{Évolutions : GLIBC 2.42 \& 2.43}
+    \textbf{GLIBC 2.42 (Août 2025)}
+    \vspace{-0.2cm}
+    \begin{itemize}
+        \item Cohérence exigée à l'insertion en \textit{Unsorted} / \textit{Largebins}.
+        \item \textbf{Cible} : Neutralisation des \textit{Largebin Attacks}.
+        \item Règle stricte bilatérale : \texttt{P->fd\_nextsize->bk\_nextsize == P}
+    \end{itemize}
+    \vspace{0.1cm}
+    
+    \textbf{GLIBC 2.43 (Janvier 2026)}
+    \vspace{-0.2cm}
+    \begin{itemize}
+        \item \textbf{Refonte} : Suppression des \textit{Fastbins} (trop de failles historiques).
+        \item Petites allocations gérées par \textit{Tcache} et \textit{Smallbins}.
+        \item \textit{Safe Linking} étendu à tout l'allocateur.
+    \end{itemize}
 \end{frame}
 
-\begin{frame}{Conclusion}
+\begin{frame}[fragile]{Conclusion}
+    \textbf{Le crépuscule des métadonnées ?}
+    \vspace{-0.2cm}
+    \begin{itemize}
+        \item Durcissements successifs : \textit{Safe Linking}, vérifications croisées (\texttt{nextsize}).
+        \item Disparition des listes peu protégées (\textit{Fastbins}).
+        \item Arbitrary Write devient coûteux (multiples fuites nécessaires : `heap`, `libc`).
+    \end{itemize}
+    \vspace{0.4cm}
+    
+    \textbf{Pivot vers la corruption applicative}
+    \vspace{-0.2cm}
+    \begin{itemize}
+        \item Les défenses modernes protègent la machinerie GLIBC, pas la logique métier.
+        \item \textbf{Data-Only Attacks} : Attaquer directement les structures adjacentes (privilèges, états).
+        \item \texttt{malloc} n'est plus la cible, mais l'outil.
+    \end{itemize}
 \end{frame}
 
 \end{document}
