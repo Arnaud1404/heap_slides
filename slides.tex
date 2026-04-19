@@ -3,40 +3,48 @@
 
 \usetheme{metropolis}
 
+% --- Encodage & langue ---
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
-\usepackage[french]{babel} % Tout le contenu est en français, sauf les termes techniques
-\usepackage{inconsolata} % Police mono plus grasse pour projecteur
+\usepackage[french]{babel}
+
+% --- Police mono ---
+\usepackage{inconsolata}
+
+% --- Maths ---
+\usepackage{amsmath, amssymb}
+
+% --- Minted ---
 \usepackage{minted}
-
 \setminted{
-    style=xcode,             % Thème clair IDE (fond blanc pur, pas de rose sur les strings)
-    fontsize=\scriptsize,    % Taille équilibrée pour Beamer
+    style=xcode,
+    fontsize=\scriptsize,
     breaklines=true,
-    breakanywhere=true,      % Évite que le code dépasse de la slide
-    linenos=true,            % Numéros de ligne pour guider le jury
+    breakanywhere=true,
+    linenos=true,
     numbersep=5pt,
-    frame=leftline,          % Barre verticale à gauche pour délimiter
-    framerule=1.5pt,         % Plus épais pour être vu du fond
+    frame=leftline,
+    framerule=1.5pt,
     framesep=3mm,
-    rulecolor=\color{black}, % Noir pur pour la structure
-    bgcolor=white,           % Fond blanc pur (contraste maximum)
-    fontfamily=tt,           % Police mono standard (plus épaisse que Cascadia)
+    rulecolor=\color{black},
+    bgcolor=white,
+    fontfamily=tt,
 }
-
-% Force les mots-clés en noir pur et gras pour le projecteur
 \AtBeginEnvironment{minted}{\color{black}}
 \AtBeginEnvironment{frame}{\small}
 \renewcommand{\theFancyVerbLine}{\textcolor{black}{\scriptsize\arabic{FancyVerbLine}}}
 
+% --- tcolorbox (pour ccode & pwndbg) ---
 \usepackage[breakable]{tcolorbox}
-\usepackage{tikz}
-\usetikzlibrary{calc,positioning,arrows.meta,decorations.pathreplacing}
-\usepackage{amsmath, amssymb}
+\tcbuselibrary{skins, minted}
 
-\tcbuselibrary{minted, skins}
+% --- TikZ ---
+\usepackage{tikz}
+\usetikzlibrary{calc,positioning,arrows.meta,decorations.pathreplacing,shadows}
+
+% --- Couleurs personnalisées ---
 \usepackage{xcolor}
-\usepackage{listings}
+% (tes definecolor ici)
 
 % ----- Couleurs pour l'analyse des chunks Heap (Optimisées LCD/DLP) -----
 \definecolor{chunkPrevSize}{HTML}{5C4033} % Brun     : prev_size (Terre d'ombre brûlée)
@@ -126,23 +134,61 @@
     \end{itemize}
 \end{frame}
 
-\begin{frame}{ptmalloc2}
 
+\begin{frame}{C'est quoi malloc}
+
+    \begin{center}
+        \begin{tikzpicture}[
+            node distance=6mm,
+            box/.style={
+                    rectangle,
+                    rounded corners,
+                    draw=blue!60,
+                    fill=blue!10,
+                    thick,
+                    text width=6cm,
+                    align=center,
+                    drop shadow
+                },
+            arrow/.style={-{Latex[length=3mm]}, thick}
+            ]
+
+            \only<1->{\node[box] (m1) {\texttt{malloc()}};}
+
+            \only<2->{\node[box, below=of m1] (m2) {\texttt{\_\_libc\_malloc()}};}
+            \only<2->{\draw[arrow] (m1) -- (m2);}
+
+            \only<3->{\node[box, below=of m2] (m3) {\texttt{\_int\_malloc()} \\ \footnotesize (ptmalloc2)};}
+            \only<3->{\draw[arrow] (m2) -- (m3);}
+
+            \only<4->{\node[box, below=of m3] (m4) {tcache /  bins};}
+            \only<4->{\draw[arrow] (m3) -- (m4);}
+
+            \only<5->{\node[box, below=of m4] (m5) {\texttt{sysmalloc()}};}
+            \only<5->{\draw[arrow] (m4) -- (m5);}
+
+            \only<6->{\node[box, below=of m5] (m6) {\texttt{brk()} ou \texttt{mmap()}};}
+            \only<6->{\draw[arrow] (m5) -- (m6);}
+
+        \end{tikzpicture}
+    \end{center}
 
 \end{frame}
 
-\begin{frame}{Chunk}
+
+\begin{frame}{C'est quoi malloc}
+
+    bins
+\end{frame}
+
+
+\begin{frame}{C'est quoi malloc}
     \centering
     \includegraphics[width=\textwidth]{images/malloc_chunk_layout.png}
 \end{frame}
 
 
-\begin{frame}{Dans un processus}
 
-    pas de heap utilisateurs
-    brk()
-
-\end{frame}
 
 \section{Le Cœur : 1 Type d'Exploit = 1 Primitive (12 min)}
 
