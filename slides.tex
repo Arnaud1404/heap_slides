@@ -313,7 +313,11 @@
         \end{column}
     \end{columns}
     \vspace{0.2em}
+    <<<<<<< HEAD
 
+    =======
+
+    >>>>>>> f8d4c2014903de7eabe1d81cd7525fd1a799d035
     \begin{ccode}
         long *a = malloc(0x20); free(a); // 'a' dans Tcache
         *a = 0xdeadbeef;                 // UAF : fd corrompu !
@@ -461,7 +465,11 @@
         \end{column}
     \end{columns}
     \vspace{-0.5em}
+    <<<<<<< HEAD
 
+    =======
+
+    >>>>>>> f8d4c2014903de7eabe1d81cd7525fd1a799d035
     \begin{ccode}
         long *p1 = malloc(0x80-8); long *p2 = malloc(0x500-8);
         long *p3 = malloc(0x80-8); malloc(0x10); // guard
@@ -478,7 +486,11 @@
         0x5...000 0x0...081 (p1)
         @\makebox[0pt][l]{\fboxsep=0pt\color{red}\fbox{\phantom{0x5...080}}}0x5...080@ @\textcolor{pwndbgred}{0x0...581}@ (p2 corrompu, taille fake 0x580)
         0x5...580 0x0...081 (p3 désormais inclus dans p4)
+        <<<<<<< HEAD
         ...
+        =======
+        ...
+        >>>>>>> f8d4c2014903de7eabe1d81cd7525fd1a799d035
         0x5...600 0x3434343434343434 (p4 et p3 partagent cette zone)
     \end{pwndbg}
 \end{frame}
@@ -500,7 +512,11 @@
         \end{column}
     \end{columns}
     \vspace{0.2em}
+    <<<<<<< HEAD
 
+    =======
+
+    >>>>>>> f8d4c2014903de7eabe1d81cd7525fd1a799d035
     \begin{ccode}
         typedef struct { void (*execute)(); } task_t; // 8 octets
         typedef struct { char content[8]; } msg_t;    // 8 octets
