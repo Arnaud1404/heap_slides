@@ -75,6 +75,8 @@
 \definecolor{pwndbgblue}{HTML}{0184BC}
 \definecolor{pwndbggreen}{HTML}{50A14F}
 \definecolor{pwndbgbrown}{HTML}{A52A2A}
+\definecolor{pwndbgpurple}{HTML}{8E44AD}
+\definecolor{pwndbgorange}{HTML}{D35400}
 
 \newtcblisting{pwndbg}[2][]{%
     listing engine=minted,
@@ -124,6 +126,7 @@
     \end{itemize}
 \end{frame}
 
+<<<<<<< HEAD
 \begin{frame}{ptmalloc2}
 
 
@@ -140,6 +143,12 @@
     pas de heap utilisateurs
     brk()
 
+=======
+\begin{frame}[fragile]{ptmalloc2}
+\end{frame}
+
+\begin{frame}[fragile]{Structure d\'un Chunk}
+>>>>>>> a400cba (fixed spacing and added red rectangles)
 \end{frame}
 
 \section{Le Cœur : 1 Type d'Exploit = 1 Primitive (12 min)}
@@ -159,15 +168,20 @@
             \end{itemize}
         \end{column}
     \end{columns}
+<<<<<<< HEAD
     \vspace{-1.5em}
 
+=======
+    \vspace{0.2em}
+    
+>>>>>>> a400cba (fixed spacing and added red rectangles)
     \begin{ccode}
         long *a = malloc(0x20); free(a); // 'a' dans Tcache
         *a = 0xdeadbeef;                 // UAF : fd corrompu !
         malloc(0x20);                    // Dépile 'a'
         long *target = malloc(0x20);     // Ciblera 0xdeadbeef !
     \end{ccode}
-    \vspace{-1.5em}
+    \vspace{0.2em}
 
     \begin{pwndbg}[tcachebins]{text}
         tcachebins
@@ -274,17 +288,23 @@
             \end{itemize}
         \end{column}
     \end{columns}
-    \vspace{-1.5em}
+    \vspace{0.2em}
 
     \begin{ccode}
         long *a = calloc(0x20); long *b = calloc(0x20);
         free(a); free(b); free(a);
 
+<<<<<<< HEAD
         long *c = calloc(0x20); // Bloc A
         long *d = calloc(0x20); // Bloc B
         long *e = calloc(0x20); // Bloc A ! (Contrôle zone c)
+=======
+long *c = calloc(0x20); // Bloc A
+long *d = calloc(0x20); // Bloc B
+long *e = calloc(0x20); // Bloc A (Contrôle B)
+>>>>>>> a400cba (fixed spacing and added red rectangles)
     \end{ccode}
-    \vspace{-1.5em}
+    \vspace{0.2em}
 
     \begin{pwndbg}[bins]{text}
         fastbins
@@ -297,36 +317,54 @@
         \begin{column}{0.48\textwidth}
             \textbf{Mécanisme} (Cible : \texttt{size})
             \begin{itemize}
-                \item Extension d'un chunk vers un autre.
+                \item Corruption de la taille d'un chunk libre ou alloué.
             \end{itemize}
         \end{column}
         \begin{column}{0.48\textwidth}
-            \textbf{Conséquence} (\textit{Aliasing})
+            \textbf{Conséquence}
             \begin{itemize}
-                \item Effacement de données adjacentes.
+                \item Chevauchement de mémoire (\textit{Overlapping chunks}).
             \end{itemize}
         \end{column}
     \end{columns}
+<<<<<<< HEAD
     \vspace{-1.5em}
 
+=======
+    \vspace{-0.5em}
+    
+>>>>>>> a400cba (fixed spacing and added red rectangles)
     \begin{ccode}
         long *p1 = malloc(0x80-8); long *p2 = malloc(0x500-8);
         long *p3 = malloc(0x80-8); malloc(0x10); // guard
 
+<<<<<<< HEAD
         *(p2 - 1) = 0x581; // OVERFLOW (size altée)
         free(p2); // p2 dans l'Unsorted Bin avec fausse taille
+=======
+*(p2 - 1) = 0x581; // OVERFLOW (fake_size = 0x500 + 0x80 + 1)
+free(p2); // p2 dans l'Unsorted Bin avec fausse taille
+>>>>>>> a400cba (fixed spacing and added red rectangles)
 
         long *p4 = malloc(0x580 - 8); // Chevauche p3 !
         memset(p4, '4', 0x580 - 8);   // Écrase p3 en silence
     \end{ccode}
-    \vspace{-1.5em}
+    \vspace{-0.5em}
 
     \begin{pwndbg}[heap]{text}
+<<<<<<< HEAD
         0x5...000 0x...081 (p1)
         0x5...080 @\textcolor{pwndbgred}{0x0...581}@ (p2 corrompu, taille \textit{fake} 0x580)
         0x5...580 0x0...081 (p3 originel non modifié)
         ...
         0x5...600 0x3434343434343434 (p4 et p3 tapent ici !)
+=======
+0x5...000 0x0...081 (p1)
+@\makebox[0pt][l]{\fboxsep=0pt\color{red}\fbox{\phantom{0x5...080}}}0x5...080@ @\textcolor{pwndbgred}{0x0...581}@ (p2 corrompu, taille fake 0x580)
+0x5...580 0x0...081 (p3 désormais inclus dans p4)
+...       
+0x5...600 0x3434343434343434 (p4 et p3 partagent cette zone)
+>>>>>>> a400cba (fixed spacing and added red rectangles)
     \end{pwndbg}
 \end{frame}
 
@@ -335,18 +373,24 @@
         \begin{column}{0.48\textwidth}
             \textbf{Le Pivot Applicatif}
             \begin{itemize}
-                \item GLIBC ignorée, Cible : Logique interne du programme.
+                \item GLIBC ignorée.
+                \item Cible : Logique interne du programme.
             \end{itemize}
         \end{column}
         \begin{column}{0.48\textwidth}
-            \textbf{Invisibilité système}
+            \textbf{Avantage Majeur}
             \begin{itemize}
-                \item Aucune sécurité métadonnée (\textit{Safe Linking}) déclenchée.
+                \item Aucune sécurité type \textit{Safe Linking}.
             \end{itemize}
         \end{column}
     \end{columns}
+<<<<<<< HEAD
     \vspace{-2.0em}
 
+=======
+    \vspace{0.2em}
+    
+>>>>>>> a400cba (fixed spacing and added red rectangles)
     \begin{ccode}
         typedef struct { void (*execute)(); } task_t; // 8 octets
         typedef struct { char content[8]; } msg_t;    // 8 octets
@@ -359,6 +403,7 @@
 
         task->execute(); // Exécute win() !
     \end{ccode}
+<<<<<<< HEAD
     \vspace{-2.0em}
 
     \begin{pwndbg}[stack]{text}
@@ -366,14 +411,16 @@
         ...
         01:0008|     0x7ffd...448 {b} @\textcolor{pwndbgblue}{->}@ 0x7ffd...460 {fake\_chunks+0x10}
     \end{pwndbg}
+=======
+>>>>>>> a400cba (fixed spacing and added red rectangles)
 \end{frame}
 
-\begin{frame}{Largebin}
+\begin{frame}[fragile]{Largebin}
 \end{frame}
 
 \section{Défenses et Perspectives (4 min)}
 
-\begin{frame}{ASLR}
+\begin{frame}{ASLR et Fuite d\'Adresses (Leacks)}
 \end{frame}
 
 \begin{frame}{Évolutions : GLIBC 2.42 \& 2.43}
