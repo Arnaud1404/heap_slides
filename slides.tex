@@ -126,24 +126,6 @@
     \end{itemize}
 \end{frame}
 
-<<<<<<< HEAD
-\begin{frame}{ptmalloc2}
-
-
-\end{frame}
-
-\begin{frame}{Chunk}
-    \centering
-    \includegraphics[width=\textwidth]{images/malloc_chunk_layout.png}
-\end{frame}
-
-
-\begin{frame}{Dans un processus}
-
-    pas de heap utilisateurs
-    brk()
-
-=======
 \begin{frame}[fragile]{ptmalloc2}
 \end{frame}
 
@@ -177,13 +159,8 @@
             \end{itemize}
         \end{column}
     \end{columns}
-<<<<<<< HEAD
-    \vspace{-1.5em}
-
-=======
     \vspace{0.2em}
     
->>>>>>> a400cba (fixed spacing and added red rectangles)
     \begin{ccode}
         long *a = malloc(0x20); free(a); // 'a' dans Tcache
         *a = 0xdeadbeef;                 // UAF : fd corrompu !
@@ -303,15 +280,9 @@
         long *a = calloc(0x20); long *b = calloc(0x20);
         free(a); free(b); free(a);
 
-<<<<<<< HEAD
         long *c = calloc(0x20); // Bloc A
         long *d = calloc(0x20); // Bloc B
-        long *e = calloc(0x20); // Bloc A ! (Contrôle zone c)
-=======
-long *c = calloc(0x20); // Bloc A
-long *d = calloc(0x20); // Bloc B
-long *e = calloc(0x20); // Bloc A (Contrôle B)
->>>>>>> a400cba (fixed spacing and added red rectangles)
+        long *e = calloc(0x20); // Bloc A (Contrôle B)
     \end{ccode}
     \vspace{0.2em}
 
@@ -336,24 +307,14 @@ long *e = calloc(0x20); // Bloc A (Contrôle B)
             \end{itemize}
         \end{column}
     \end{columns}
-<<<<<<< HEAD
-    \vspace{-1.5em}
-
-=======
     \vspace{-0.5em}
     
->>>>>>> a400cba (fixed spacing and added red rectangles)
     \begin{ccode}
         long *p1 = malloc(0x80-8); long *p2 = malloc(0x500-8);
         long *p3 = malloc(0x80-8); malloc(0x10); // guard
 
-<<<<<<< HEAD
-        *(p2 - 1) = 0x581; // OVERFLOW (size altée)
+        *(p2 - 1) = 0x581; // OVERFLOW (fake_size = 0x500 + 0x80 + 1)
         free(p2); // p2 dans l'Unsorted Bin avec fausse taille
-=======
-*(p2 - 1) = 0x581; // OVERFLOW (fake_size = 0x500 + 0x80 + 1)
-free(p2); // p2 dans l'Unsorted Bin avec fausse taille
->>>>>>> a400cba (fixed spacing and added red rectangles)
 
         long *p4 = malloc(0x580 - 8); // Chevauche p3 !
         memset(p4, '4', 0x580 - 8);   // Écrase p3 en silence
@@ -361,19 +322,11 @@ free(p2); // p2 dans l'Unsorted Bin avec fausse taille
     \vspace{-0.5em}
 
     \begin{pwndbg}[heap]{text}
-<<<<<<< HEAD
-        0x5...000 0x...081 (p1)
-        0x5...080 @\textcolor{pwndbgred}{0x0...581}@ (p2 corrompu, taille \textit{fake} 0x580)
-        0x5...580 0x0...081 (p3 originel non modifié)
-        ...
-        0x5...600 0x3434343434343434 (p4 et p3 tapent ici !)
-=======
-0x5...000 0x0...081 (p1)
-@\makebox[0pt][l]{\fboxsep=0pt\color{red}\fbox{\phantom{0x5...080}}}0x5...080@ @\textcolor{pwndbgred}{0x0...581}@ (p2 corrompu, taille fake 0x580)
-0x5...580 0x0...081 (p3 désormais inclus dans p4)
-...       
-0x5...600 0x3434343434343434 (p4 et p3 partagent cette zone)
->>>>>>> a400cba (fixed spacing and added red rectangles)
+        0x5...000 0x0...081 (p1)
+        @\makebox[0pt][l]{\fboxsep=0pt\color{red}\fbox{\phantom{0x5...080}}}0x5...080@ @\textcolor{pwndbgred}{0x0...581}@ (p2 corrompu, taille fake 0x580)
+        0x5...580 0x0...081 (p3 désormais inclus dans p4)
+        ...       
+        0x5...600 0x3434343434343434 (p4 et p3 partagent cette zone)
     \end{pwndbg}
 \end{frame}
 
@@ -393,13 +346,8 @@ free(p2); // p2 dans l'Unsorted Bin avec fausse taille
             \end{itemize}
         \end{column}
     \end{columns}
-<<<<<<< HEAD
-    \vspace{-2.0em}
-
-=======
     \vspace{0.2em}
     
->>>>>>> a400cba (fixed spacing and added red rectangles)
     \begin{ccode}
         typedef struct { void (*execute)(); } task_t; // 8 octets
         typedef struct { char content[8]; } msg_t;    // 8 octets
@@ -412,16 +360,6 @@ free(p2); // p2 dans l'Unsorted Bin avec fausse taille
 
         task->execute(); // Exécute win() !
     \end{ccode}
-<<<<<<< HEAD
-    \vspace{-2.0em}
-
-    \begin{pwndbg}[stack]{text}
-        00:0000| rsp 0x7ffd...440 {a} @\textcolor{pwndbgblue}{->}@ 0x7ffd...460 {fake\_chunks+0x10}
-        ...
-        01:0008|     0x7ffd...448 {b} @\textcolor{pwndbgblue}{->}@ 0x7ffd...460 {fake\_chunks+0x10}
-    \end{pwndbg}
-=======
->>>>>>> a400cba (fixed spacing and added red rectangles)
 \end{frame}
 
 \begin{frame}[fragile]{Largebin}
