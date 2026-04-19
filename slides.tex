@@ -26,6 +26,7 @@
 
 % Force les mots-clés en noir pur et gras pour le projecteur
 \AtBeginEnvironment{minted}{\color{black}}
+\AtBeginEnvironment{frame}{\small}
 \renewcommand{\theFancyVerbLine}{\textcolor{black}{\scriptsize\arabic{FancyVerbLine}}}
 
 \usepackage[breakable]{tcolorbox}
@@ -126,16 +127,20 @@
         \item \textbf{Tcache Poisoning} : corruption pointeur de chaînage \texttt{fd}.
         \item Objectif final : point d'écriture arbitraire via \texttt{malloc()}.
     \end{itemize}
+    \vspace{-0.5em}
     
     \textbf{Mitigation : Safe Linking (GLIBC 2.32+)}
     \begin{itemize}
         \item Masquage cryptographique \textit{freelist} : $C = (L \gg 12) \oplus P$.
+        \item $L$ : Adresse mémoire stockant le pointeur (\textit{Location}). \\ $P$ : Pointeur cible.
         \item Fin des attaques aveugles $\rightarrow$ nécessité de \textit{heap leak}.
     \end{itemize}
+    \vspace{-0.5em}
 
     \textbf{Inversion algorithmique (XOR-shift)}
+    \vspace{-0.5em}
     \begin{center}
-        \resizebox{0.85\textwidth}{!}{
+        \resizebox{0.95\textwidth}{!}{
             \begin{tikzpicture}[
                     node distance=1.2cm,
                     bitbox/.style={draw, minimum width=2.2cm, minimum height=0.8cm, font=\ttfamily\small, outer sep=0pt},
@@ -148,10 +153,6 @@
                     separator/.style={gray!30, dashed, line width=0.5pt},
                     label/.style={font=\sffamily\scriptsize\bfseries}
                 ]
-
-                \node[font=\sffamily\small\bfseries, gray] at (0, 1.2) {$i=1$};
-                \node[font=\sffamily\small\bfseries, gray] at (3.5, 1.2) {$i=2$};
-                \node[font=\sffamily\small\bfseries, gray] at (7.8, 1.2) {$i=5$ (Final)};
 
                 \node[bitbox, cipher] (C1) at (0, 0) {$P_{63:52} \oplus 0$};
                 \node[draw, circle, inner sep=1pt, fill=white, font=\small] (xor1) at (0, -1.2) {$\oplus$};
@@ -175,18 +176,44 @@
                     }
 
                 \draw[cascade] (P1.east) -| (M2.south)
-                node[pos=0.2, above, font=\tiny, text=red!80!black] {$\gg 12$};
+                node[pos=0.5, below, font=\scriptsize\bfseries, text=red!80!black] {$\gg 12$};
 
-                \draw[separator] (1.75, 1.4) -- (1.75, -3.2);
-                \draw[separator] (6.5, 1.4) -- (6.5, -3.2);
+                \draw[separator] (1.75, 0.6) -- (1.75, -3.2);
+                \draw[separator] (6.5, 0.6) -- (6.5, -3.2);
 
                 \node at (5.2, 0) {\dots}; \node at (5.2, -1.2) {\dots}; \node at (5.2, -2.4) {\dots};
+
+                \node[label, left=0.15cm of C1] {\textbf{C}};
+                \node[label, left=0.15cm of M1] {\textbf{Masque}};
+                \node[label, left=0.15cm of P1] {\textbf{P}};
             \end{tikzpicture}
         }
     \end{center}
 \end{frame}
 
-\begin{frame}{Double Free}
+\begin{frame}[fragile]{Double Free}
+    \textbf{Vulnérabilité \& Primitive}
+    \begin{itemize}
+        \item \textbf{Fastbin Dup} : double libération contournant le LIFO simple (\texttt{free($A \rightarrow B \rightarrow A$)}).
+        \item Permet d'ignorer la vérification anti-double-free (\texttt{key}) du Tcache.
+        \item \textbf{Résultat} : liste circulaire (boucle pour écriture arbitraire).
+    \end{itemize}
+    \vspace{-0.2em}
+
+    \begin{ccode}
+long *a = calloc(1, 0x20); long *b = calloc(1, 0x20);
+free(a); free(b); free(a);
+
+long *c = calloc(1, 0x20); // Retourne bloc A
+long *d = calloc(1, 0x20); // Retourne bloc B
+long *e = calloc(1, 0x20); // Retourne bloc A !
+    \end{ccode}
+    \vspace{-0.2em}
+
+    \begin{pwndbg}[bins]{text}
+fastbins
+  0x20: 0x5555555593e0 @\textcolor{pwndbgblue}{->}@ 0x555555559400 @\textcolor{pwndbgblue}{<-}@ @\textcolor{pwndbgred}{0x5555555593e0 (loop)}@
+    \end{pwndbg}
 \end{frame}
 
 \begin{frame}{Heap Overflow}

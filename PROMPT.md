@@ -26,3 +26,11 @@
 - **Introduction** : Synthèse `01_rappels.tex` / `02_malloc.tex`
 - **Exploitation (Primitives)** : Synthèse `04_exploitation*.tex`
 - **Mitigations (ASLR / GLIBC)** : Extractions sections de défense / conclusion
+
+**Génération de notes d'accompagnement (Obligatoire)**
+- Pour chaque slide générée, mettre à jour `NOTES_ORAL.md`.
+- **Contenu des notes** :
+    - Explication orale détaillée du concept technique (phrases complètes).
+    - Section "Questions pièges du jury" : anticiper les interrogations sur les détails d'implémentation (ex: pourquoi `calloc`, spécificités des versions GLIBC, calculs d'offsets).
+    - Définition des termes complexes non détaillés sur la slide.
+- **Format** : Markdown structuré avec titres correspondant aux titres des slides.
