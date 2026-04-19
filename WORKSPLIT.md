@@ -19,12 +19,12 @@
     * Métadonnées en état libre : apparition des pointeurs `fd` et `bk`.
 
 ### Section II : Primitive Moderne (Largebin)
-* **Slide 7 : Largebin Attack**
+* **Slide 8 : Largebin Attack**
     * Corruption des pointeurs `bk_nextsize` via UAF.
     * Primitive : Écriture d'adresse arbitraire via le tri de l'Unsorted Bin.
 
 ### Section III : Défenses
-* **Slide 8 : La barrière de l'ASLR**
+* **Slide 9 : La barrière de l'ASLR**
     * Randomisation des bases (Libc, Heap, Stack).
     * Nécessité de l'Arbitrary Read (Leak) pour recalculer les offsets réels.
 
@@ -42,10 +42,13 @@
 * **Slide 6 : Heap Overflow & Overlapping**
     * Corruption du champ `size` pour étendre un chunk.
     * Primitive : Aliasing mémoire (deux pointeurs sur une même zone).
+* **Slide 7 : Heap Overflow Applicatif (Data-Only)**
+    * Corruption de structures métier C adjacentes (ex: variables de droits).
+    * Bypass total des métadonnées `malloc` face aux durcissements GLIBC.
 
 ### Section III : Perspectives et Conclusion
-* **Slide 9 : Évolutions GLIBC 2.42 & 2.43**
+* **Slide 10 : Évolutions GLIBC 2.42 & 2.43**
     * 2.42 : Vérification de cohérence `nextsize` (neutralisation Largebin Attack).
     * 2.43 : Suppression physique des Fastbins au profit du Tcache/Smallbins.
-* **Slide 10 : Conclusion**
-    * Pivot vers la Type Confusion applicative face au durcissement des métadonnées.
+* **Slide 11 : Conclusion**
+    * Pivot vers les Data-Only Attacks.
