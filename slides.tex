@@ -149,13 +149,13 @@
 
 \begin{document}
 
-\begin{frame}
+\begin{frame}[plain]
     \titlepage
 \end{frame}
 
 \section{Introduction et Fondamentaux (4 min)}
 
-\begin{frame}{Objectif}
+\begin{frame}[plain]{Objectif}
 
     \begin{itemize}
         \item Fonctionnement de malloc
@@ -164,7 +164,7 @@
 \end{frame}
 
 
-\begin{frame}{C'est quoi malloc(1 /3)}
+\begin{frame}[plain]{C'est quoi malloc(1 /3)}
 
     \begin{center}
         \begin{tikzpicture}[
@@ -203,7 +203,7 @@
     \end{center}
 
 \end{frame}
-\begin{frame}{C'est quoi malloc(2 /3)}
+\begin{frame}[plain]{C'est quoi malloc(2 /3)}
 
     \begin{minipage}{0.40\textwidth}
         \begin{tikzpicture}[
@@ -246,7 +246,7 @@
 
 \end{frame}
 
-\begin{frame}{C'est quoi malloc(3 /3)}
+\begin{frame}[plain]{C'est quoi malloc(3 /3)}
 
     \begin{minipage}{0.40\textwidth}
         \begin{tikzpicture}[
@@ -313,7 +313,7 @@
 
 
 
-\begin{frame}{Tcache}
+\begin{frame}[plain]{Tcache}
 
     \begin{minipage}{0.40\textwidth}
 
@@ -353,7 +353,7 @@
 
 \end{frame}
 
-\begin{frame}{Fastbins}
+\begin{frame}[plain]{Fastbins}
 
     \begin{minipage}{0.40\textwidth}
 
@@ -396,7 +396,7 @@
 
 \end{frame}
 
-\begin{frame}{Unsorted bin}
+\begin{frame}[plain]{Unsorted bin}
 
     \begin{minipage}{0.40\textwidth}
 
@@ -434,7 +434,7 @@
 
 \end{frame}
 
-\begin{frame}{Smallbins}
+\begin{frame}[plain]{Smallbins}
 
     \begin{minipage}{0.40\textwidth}
 
@@ -478,7 +478,7 @@
 \end{frame}
 
 
-\begin{frame}{Largebins}
+\begin{frame}[plain]{Largebins}
 
     \begin{minipage}{0.40\textwidth}
 
@@ -517,7 +517,7 @@
 
 \end{frame}
 
-\begin{frame}{Exemple largebins}
+\begin{frame}[plain]{Exemple largebins}
 
     \begin{tikzpicture}[
         bin/.style={
@@ -591,7 +591,7 @@
 
 \section{Le Cœur : 1 Type d'Exploit = 1 Primitive (12 min)}
 
-\begin{frame}[fragile]{Use-After-Free (UAF) \& Safe Linking (1/3)}
+\begin{frame}[plain,fragile]{Use-After-Free (UAF) \& Safe Linking (1/3)}
     \begin{columns}[T]
         \begin{column}{0.48\textwidth}
             \textbf{Vulnérabilité} : \textit{Use-After-Free}
@@ -622,7 +622,7 @@
     \end{pwndbg}
 \end{frame}
 
-\begin{frame}[fragile]{Use-After-Free (UAF) \& Safe Linking (2/3)}
+\begin{frame}[plain,fragile]{Use-After-Free (UAF) \& Safe Linking (2/3)}
     \textbf{Mitigation : Safe Linking (GLIBC 2.32+)}
     \begin{itemize}
         \item Masquage cryptographique du Tcache Poisoning aveugle.
@@ -651,7 +651,7 @@
     \end{columns}
 \end{frame}
 
-\begin{frame}[fragile]{Use-After-Free (UAF) \& Safe Linking (3/3)}
+\begin{frame}[plain,fragile]{Use-After-Free (UAF) \& Safe Linking (3/3)}
     \textbf{Inversion algorithmique (XOR-shift)}
     \vspace{-0.5em}
     \begin{center}
@@ -706,7 +706,7 @@
     \end{center}
 \end{frame}
 
-\begin{frame}[fragile]{Double Free : Fastbin Dup}
+\begin{frame}[plain,fragile]{Double Free : Fastbin Dup}
     \begin{columns}[T]
         \begin{column}{0.48\textwidth}
             \textbf{Vulnérabilité}
@@ -739,7 +739,7 @@
     \end{pwndbg}
 \end{frame}
 
-\begin{frame}[fragile]{Heap Overflow \& Overlapping}
+\begin{frame}[plain,fragile]{Heap Overflow \& Overlapping}
     \begin{columns}[T]
         \begin{column}{0.48\textwidth}
             \textbf{Mécanisme} (Cible : \texttt{size})
@@ -776,7 +776,7 @@
     \end{pwndbg}
 \end{frame}
 
-\begin{frame}[fragile]{Exploitation Applicative : Type Confusion}
+\begin{frame}[plain,fragile]{Exploitation Applicative : Type Confusion}
     \begin{columns}[T]
         \begin{column}{0.48\textwidth}
             \textbf{Le Pivot Applicatif}
@@ -807,7 +807,7 @@
     \end{ccode}
 \end{frame}
 
-\begin{frame}[fragile]{Largebin attack(1 /3)}
+\begin{frame}[plain,fragile]{Largebin attack(1 /3)}
     \begin{ccode}
         int main(){
                 /* Désactiver l'I/O buffering pour protéger la heap */
@@ -831,7 +831,7 @@
     \end{ccode}
 \end{frame}
 
-\begin{frame}[fragile]{Largebin attack(2 /3)}
+\begin{frame}[plain,fragile]{Largebin attack(2 /3)}
     \begin{ccode}
         int main(){
                 // ... setup omitted ...
@@ -907,7 +907,7 @@
 \end{frame}
 
 
-\begin{frame}[fragile]{Largebin attack(3 /3)}
+\begin{frame}[plain,fragile]{Largebin attack(3 /3)}
     \begin{ccode}
         int main() {
                 // ... allocations & frees omitted ...
@@ -1024,7 +1024,7 @@
 \section{Défenses et Perspectives (4 min)}
 
 
-\begin{frame}{Évolutions : GLIBC 2.42 \& 2.43}
+\begin{frame}[plain]{Évolutions : GLIBC 2.42 \& 2.43}
     \textbf{GLIBC 2.42 (Août 2025)}
     \vspace{-0.2cm}
     \begin{itemize}
@@ -1043,7 +1043,7 @@
     \end{itemize}
 \end{frame}
 
-\begin{frame}[fragile]{Conclusion}
+\begin{frame}[plain,fragile]{Conclusion}
     \textbf{Le crépuscule des métadonnées ?}
     \vspace{-0.2cm}
     \begin{itemize}
