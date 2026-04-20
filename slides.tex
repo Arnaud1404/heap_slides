@@ -118,6 +118,26 @@
     \end{tikzpicture}
 }
 
+
+%*******  Chunk *****%
+\tikzset{
+    chunk/.style={
+        rectangle, draw=black, thick,
+        minimum width=2.2cm,
+        minimum height=7mm,
+        align=center
+    }
+}
+
+\newcommand{\ChunkFree}{
+    \begin{tikzpicture}[chunk]
+        \node[chunk, fill=chunkSize!20] (size) {size};
+        \node[chunk, fill=chunkFd!20, right=0mm of size] (fd) {fd};
+        \node[chunk, fill=chunkBk!20, right=0mm of fd] (bk) {bk};
+    \end{tikzpicture}
+}
+
+
 \begin{document}
 
 \begin{frame}
@@ -174,13 +194,6 @@
     \end{center}
 
 \end{frame}
-
-
-\begin{frame}{C'est quoi malloc}
-
-    bins
-\end{frame}
-
 
 \begin{frame}{C'est quoi malloc}
 
@@ -292,6 +305,263 @@
     \end{minipage}
 
 \end{frame}
+
+
+
+\begin{frame}{Tcache}
+
+    \begin{minipage}{0.40\textwidth}
+
+        \begin{tikzpicture}[
+            cell/.style={
+                    rectangle, draw=black, thick,
+                    minimum width=2.2cm,
+                    minimum height=7mm,
+                    align=center
+                },
+            arrow/.style={-{Latex[length=3mm]}, thick}
+            ]
+
+            \node[cell, fill=chunkFd!20] (Afd) at (0,0) {fd};
+            \node[cell, fill=chunkFd!20, below=1cm of Afd] (Bfd) {fd};
+
+            \draw[arrow] (Afd.south) -- (Bfd.north);
+
+            \node[above=0.4cm,font=\bfseries] at (Afd.north) {Tcache bin};
+
+        \end{tikzpicture}
+
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.50\textwidth}
+
+        \textbf{Tcache :}
+
+        \begin{itemize}
+            \item Liste \textbf{simplement chaînée}
+            \item Un tcache par thread
+            \item Jusqu’à 7 chunks par classe de taille
+            \item Tailles : de \texttt{0x20} à \texttt{0x410}
+        \end{itemize}
+
+    \end{minipage}
+
+\end{frame}
+
+\begin{frame}{Fastbins}
+
+    \begin{minipage}{0.40\textwidth}
+
+        \begin{tikzpicture}[
+            cell/.style={
+                    rectangle, draw=black, thick,
+                    minimum width=2.2cm,
+                    minimum height=7mm,
+                    align=center
+                },
+            arrow/.style={-{Latex[length=3mm]}, thick}
+            ]
+
+            % Chunk A
+            \node[cell, fill=chunkFd!20] (Afd) at (0,0) {fd};
+
+            % Chunk B
+            \node[cell, fill=chunkFd!20, below=1cm of Afd] (Bfd) {fd};
+
+            % Chaînage simple
+            \draw[arrow] (Afd.south) -- (Bfd.north);
+
+            \node[above=0.4cm,font=\bfseries] at (Afd.north) {Fastbin};
+
+        \end{tikzpicture}
+
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.50\textwidth}
+
+        \textbf{Fastbins :}
+
+        \begin{itemize}
+            \item Liste \textbf{simplement chaînée LIFO}
+            \item Tailles fixes : \texttt{0x20} à \texttt{0x80}
+            \item Pas de consolidation immédiate
+        \end{itemize}
+
+    \end{minipage}
+
+\end{frame}
+
+\begin{frame}{Unsorted bin}
+
+    \begin{minipage}{0.40\textwidth}
+
+        \begin{tikzpicture}[
+            cell/.style={
+                    rectangle, draw=black, thick,
+                    minimum width=2.2cm,
+                    minimum height=7mm,
+                    align=center
+                },
+            arrow/.style={-{Latex[length=3mm]}, thick}
+            ]
+
+            \node[cell, fill=chunkFd!20] (Afd) at (0,0) {fd};
+            \node[cell, fill=chunkBk!20, right=0mm of Afd] (Abk) {bk};
+
+            \node[above=0.4cm,font=\bfseries] at ($(Afd)!0.5!(Abk)$) {Unsorted bin};
+
+        \end{tikzpicture}
+
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.50\textwidth}
+
+        \textbf{Unsorted bin :}
+
+        \begin{itemize}
+            \item Liste \textbf{doublement chaînée FIFO} pour retirer efficassemnt
+                  en millieu de liste
+            \item Contient les chunks fraîchement libérés
+            \item Sert de point d’entrée pour redispatcher vers smallbins et largebins
+        \end{itemize}
+
+    \end{minipage}
+
+\end{frame}
+
+\begin{frame}{Smallbins}
+
+    \begin{minipage}{0.40\textwidth}
+
+        \begin{tikzpicture}[
+            cell/.style={
+                    rectangle, draw=black, thick,
+                    minimum width=2.2cm,
+                    minimum height=7mm,
+                    align=center
+                },
+            arrow/.style={-{Latex[length=3mm]}, thick}
+            ]
+
+            \node[cell, fill=chunkFd!20] (Afd) at (0,0) {fd};
+            \node[cell, fill=chunkBk!20, right=0mm of Afd] (Abk) {bk};
+
+            \node[cell, fill=chunkFd!20, below=1cm of Afd] (Bfd) {fd};
+            \node[cell, fill=chunkBk!20, right=0mm of Bfd] (Bbk) {bk};
+
+            \draw[arrow] (Afd.south) -- (Bfd.north);
+            \draw[arrow] (Bbk.north) -- (Abk.south);
+
+            \node[above=0.4cm,font=\bfseries] at ($(Afd)!0.5!(Abk)$) {Smallbin};
+
+        \end{tikzpicture}
+
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.50\textwidth}
+
+        \textbf{Smallbins :}
+
+        \begin{itemize}
+            \item Liste \textbf{doublement chaînée FIFO}
+            \item Tailles fixes : \texttt{0x20} → \texttt{0x3f0}
+            \item Toujours triés par taille
+        \end{itemize}
+
+    \end{minipage}
+
+\end{frame}
+
+\begin{frame}{Largebins}
+
+    \begin{minipage}{0.40\textwidth}
+
+        \begin{tikzpicture}[
+            cell/.style={
+                    rectangle, draw=black, thick,
+                    minimum width=2.2cm,
+                    minimum height=7mm,
+                    align=center
+                },
+            arrow/.style={-{Latex[length=3mm]}, thick}
+            ]
+
+            \node[cell, fill=chunkFd!20] (Afd) at (0,0) {fd};
+            \node[cell, fill=chunkBk!20, right=0mm of Afd] (Abk) {bk};
+
+            \node[cell, fill=chunkFdNext!20, below=0.1cm of Afd] (Afdn) {fd\_next};
+            \node[cell, fill=chunkBkNext!20, right=0mm of Afdn] (Abkn) {bk\_next};
+
+            \node[above=0.4cm,font=\bfseries] at ($(Afd)!0.5!(Abk)$) {Largebin};
+
+        \end{tikzpicture}
+
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.50\textwidth}
+
+        \textbf{Largebins :}
+
+        \begin{itemize}
+            \item Liste \textbf{doublement chaînée FIFO}
+            \item + tri par taille via \texttt{fd\_nextsize} / \texttt{bk\_nextsize}
+            \item Tailles : \texttt{> 0x400}
+            \item Utilisés pour les grosses allocations
+        \end{itemize}
+
+    \end{minipage}
+
+\end{frame}
+
+
+\begin{frame}{Largebins : sous-bins et insertion}
+
+    \begin{tikzpicture}[
+        bin/.style={
+                rectangle, draw=black, thick,
+                minimum width=3.2cm,
+                minimum height=1cm,
+                align=center
+            },
+        chunk/.style={
+                rectangle, draw=black, thick,
+                minimum width=2.6cm,
+                minimum height=7mm,
+                align=center
+            },
+        arrow/.style={-{Latex[length=3mm]}, thick},
+        every node/.style={font=\small}
+        ]
+
+        % ===========================
+        % Sous-bins (VERTICAUX)
+        % ===========================
+        \node[bin] (bin63) at (0,0) {Sous-bin 63\\0x400–0x4FF};
+        \node[bin, below=1.2cm of bin63] (bin64) {Sous-bin 64\\0x500–0x5FF};
+        \node[bin, below=1.2cm of bin64] (bin65) {Sous-bin 65\\0x600–0x6FF};
+
+        % ===========================
+        % Chunks déjà présents
+        % ===========================
+        \node[chunk, right=1.5cm of bin63] (B) {B : 0x480};
+        \node[chunk, right=1.5cm of bin64] (A) {A : 0x500};
+
+        % ===========================
+        % Nouveau chunk D
+        % ===========================
+        \node[chunk, right=1.5cm of bin65] (D) {D : 0x600};
+
+        % ===========================
+        % Flèche d'insertion
+        % ===========================
+        \draw[arrow] (D.west) -- (bin65.east);
+
+    \end{tikzpicture}
+
+\end{frame}
+
+
+
 
 
 
