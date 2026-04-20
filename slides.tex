@@ -344,7 +344,7 @@
         \textbf{Tcache :}
 
         \begin{itemize}
-            \item Liste \textbf{simplement chaînée}
+            \item Liste \textbf{simplement chaînée LIFO}
             \item Un tcache par thread
             \item Jusqu’à 7 chunks par classe de taille
             \item Tailles : de \texttt{0x20} à \texttt{0x410}
@@ -512,6 +512,7 @@
         \begin{itemize}
             \item Liste \textbf{doublement chaînée FIFO}
             \item Tailles : \texttt{0x400} → \texttt{limite mmap (128ko)}
+            \item Bins par plage de tailles
         \end{itemize}
 
     \end{minipage}
@@ -830,11 +831,6 @@
 \begin{frame}[fragile]{Largebin attack(1 /3)}
     \begin{ccode}
         int main(){
-                /* Désactiver le buffering entrée/sortie pour éviter que les flux n’interfèrent avec la heap */
-                setvbuf(stdin, NULL, _IONBF, 0);
-                setvbuf(stdout, NULL, _IONBF, 0);
-                setvbuf(stderr, NULL, _IONBF, 0);
-
                 size_t target = 0;
                 size_t *p1 = malloc(0x428), *g1 = malloc(0x18);
                 size_t *p2 = malloc(0x418), *g2 = malloc(0x18);
@@ -978,22 +974,26 @@
             \draw[fdarrow] (p2.east) -- (arena.west);
         }
 
-        % fd_nextsize boucle p1 (slide 1)
-        \visible<1>{
+        % fd_nextsize : boucle rouge sur p1 (inchangée)
+        \visible<1-2>{
             \draw[nextarrow] (p1.east)
             .. controls +(0.8,0.6) and +(0.8,-0.6)
             .. (p1.east);
         }
 
-        \visible<1-2>{\draw[prevarrow] (p1.west)
+        % bk_nextsize : boucle orange sur p1 (inchangée)
+        \visible<1>{
+            \draw[prevarrow] (p1.west)
             .. controls +(-0.8,0.6) and +(-0.8,-0.6)
-            .. (p1.west);}
-
-        % corruption flèche p1 → target (slide 2)
-        \visible<2>{
-            \draw[nextarrow] (p1.north) -- (target.south)
-            node[midway, right]{overwrite fd\_nextsize};
+            .. (p1.west);
         }
+
+        % corruption : p1 → target doit être en prevarrow (orange)
+        \visible<2>{
+            \draw[prevarrow] (p1.north) -- (target.south)
+            node[midway, right]{écrase bk\_nextsize};
+        }
+
 
         % ===========================
         % SLIDE 3 : état final après corruption
@@ -1028,7 +1028,7 @@
             \draw[prevarrow] ([yshift=-3pt]p1_3.west) -- ([yshift=-3pt]p2_3.east);
             \draw[prevarrow] (p2_3.west)
             .. controls +(-0.8,0.6) and +(-0.8,-0.6)
-            .. (p2_3.west);
+            .. (target_3.south);
         }
 
     \end{tikzpicture}
