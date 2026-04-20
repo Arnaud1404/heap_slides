@@ -161,9 +161,49 @@
         \item Fonctionnement de malloc (glibc 2.26 à 2.41)
         \item Techniques d'exploitation
     \end{itemize}
-
 \end{frame}
 
+
+\begin{frame}{C'est quoi malloc(1 /3)}
+
+    \begin{center}
+        \begin{tikzpicture}[
+            node distance=6mm,
+            box/.style={
+                    rectangle,
+                    rounded corners,
+                    draw=blue!60,
+                    fill=blue!10,
+                    thick,
+                    text width=6cm,
+                    align=center,
+                    drop shadow
+                },
+            arrow/.style={-{Latex[length=3mm]}, thick}
+            ]
+
+            \only<1->{\node[box] (m1) {\texttt{malloc()}};}
+
+            \only<2->{\node[box, below=of m1] (m2) {\texttt{\_\_libc\_malloc()}};}
+            \only<2->{\draw[arrow] (m1) -- (m2);}
+
+            \only<3->{\node[box, below=of m2] (m3) {\texttt{\_int\_malloc()} \\ \footnotesize (ptmalloc2)};}
+            \only<3->{\draw[arrow] (m2) -- (m3);}
+
+            \only<4->{\node[box, below=of m3] (m4) {tcache /  bins};}
+            \only<4->{\draw[arrow] (m3) -- (m4);}
+
+            \only<5->{\node[box, below=of m4] (m5) {\texttt{sysmalloc()}};}
+            \only<5->{\draw[arrow] (m4) -- (m5);}
+
+            \only<6->{\node[box, below=of m5] (m6) {\texttt{brk()} ou \texttt{mmap()}};}
+            \only<6->{\draw[arrow] (m5) -- (m6);}
+
+        \end{tikzpicture}
+    \end{center}
+
+\end{frame}
+\begin{frame}{C'est quoi malloc(2 /3)}
 
 \begin{frame}{ptmalloc2}
 
@@ -184,9 +224,74 @@
 
 \end{frame}
 
+\begin{frame}{C'est quoi malloc(3 /3)}
+
+    \begin{minipage}{0.40\textwidth}
+        \begin{tikzpicture}[
+                cell/.style={
+                        rectangle, draw=black, thick,
+                        minimum width=2.5cm,
+                        minimum height=8mm,
+                        align=center
+                    }
+            ]
+
+            \def\chunkh{5mm}
+
+            % Ligne 1
+            \node[cell, anchor=west, fill=chunkPrevSize!20] (prev) at (0,0) {prev\_size};
+            \node[cell, anchor=west, fill=chunkSize!20] (size) at ([xshift=0mm]prev.east) {size};
+
+            % Ligne 2
+            \node[cell, anchor=west, fill=chunkFd!20]
+            (fd) at ($(prev.south west)+(0,-\chunkh)$) {fd};
+            \node[cell, anchor=west, fill=chunkBk!20]
+            (bk) at ([xshift=0mm]fd.east) {bk};
+
+            % Ligne 3
+            \node[cell, anchor=west, fill=chunkFdNext!20]
+            (fdn) at ($(fd.south west)+(0,-\chunkh)$) {fd\_nextsize};
+            \node[cell, anchor=west, fill=chunkBkNext!20]
+            (bkn) at ([xshift=0mm]fdn.east) {bk\_nextsize};
+
+            % Ligne 4 (payload)
+            \node[cell, anchor=west, fill=chunkPayload!20, minimum width=5cm]
+            (payload) at ($(fdn.south west)+(0,-\chunkh)$) {payload};
+
+            % Titre centré
+            \node[above=0.4cm,font=\bfseries] at ($(prev)!0.5!(size)$) {Chunk libre};
+
+        \end{tikzpicture}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.50\textwidth}
+
+        \textbf{Champs supplémentaires dans un chunk libre :}
+
+        \vspace{2mm}
+
+        \begin{itemize}
+            \item \textbf{fd} : pointeur vers le prochain chunk libre
+                  dans la même bin
+
+            \item \textbf{bk} : pointeur vers le chunk libre précédent
+                  dans la même bin
+
+            \item \textbf{fd\_nextsize} : pointeur vers le prochain chunk
+                  \emph{de même taille}
+
+            \item \textbf{bk\_nextsize} : pointeur vers le chunk précédent
+                  \emph{de même taille}
+
+        \end{itemize}
+
+    \end{minipage}
+
+\end{frame}
 
 
-\begin{frame}[plain]{Tcache}
+
+\begin{frame}{Tcache}
 
     \begin{minipage}{0.40\textwidth}
 
@@ -390,7 +495,7 @@
 
 \end{frame}
 
-\begin{frame}[plain]{Exemple largebins}
+\begin{frame}{Exemple largebins}
 
     \begin{tikzpicture}[
         bin/.style={
@@ -680,10 +785,10 @@
     \end{ccode}
 \end{frame}
 
-\begin{frame}[plain,fragile]{Largebin attack(1 /3)}
+\begin{frame}[fragile]{Largebin attack(1 /3)}
     \begin{ccode}
         int main(){
-                /* Désactiver l'I/O buffering pour protéger la heap */
+                /* Disable IO buffering to prevent stream from interfering with heap */
                 setvbuf(stdin, NULL, _IONBF, 0);
                 setvbuf(stdout, NULL, _IONBF, 0);
                 setvbuf(stderr, NULL, _IONBF, 0);
@@ -696,7 +801,7 @@
                 size_t *g3 = malloc(0x438);
                 free(p2);
 
-                p1[3] = (size_t)((&target) - 4); /* Écrasement pointeur métadonnées */
+                p1[3] = (size_t)((&target) - 4); /* Overwrite metadata pointer */
                 size_t *g4 = malloc(0x438);
                 assert((size_t)(p2 - 2) == target);
                 return 0;
@@ -704,17 +809,16 @@
     \end{ccode}
 \end{frame}
 
-\begin{frame}[plain,fragile]{Largebin attack(2 /3)}
+\begin{frame}[fragile]{Largebin attack(2 /3)}
     \begin{ccode}
         int main(){
-                // ... setup omitted ...
                 size_t *p1 = malloc(0x428), *g1 = malloc(0x18);
                 size_t *p2 = malloc(0x418), *g2 = malloc(0x18);
 
                 free(p1);
                 size_t *g3 = malloc(0x438);
                 free(p2);
-                // ...
+
             }
     \end{ccode}
 
@@ -780,16 +884,13 @@
 \end{frame}
 
 
-\begin{frame}[plain,fragile]{Largebin attack(3 /3)}
+\begin{frame}[fragile]{Largebin attack(3 /3)}
     \begin{ccode}
-        int main() {
-                // ... allocations & frees omitted ...
-                
-                /* Overwrite metadata pointer (bk_nextsize) */
+        int main()
+        {
+                /* Overwrite metadata pointer */
                 p1[3] = (size_t)((&target) - 4);
                 size_t *g4 = malloc(0x438);
-                
-                // target -> p2
             }
     \end{ccode}
 
@@ -849,7 +950,7 @@
         % corruption flèche p1 → target (slide 2)
         \visible<2>{
             \draw[nextarrow] (p1.north) -- (target.south)
-            node[midway, right]{écrasement fd\_nextsize};
+            node[midway, right]{overwrite fd\_nextsize};
         }
 
         % ===========================
