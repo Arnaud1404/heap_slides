@@ -611,38 +611,63 @@
 
 
 \begin{frame}[fragile]{Use-After-Free (UAF) \& Tcache Poisoning}
-    \begin{columns}[T]
-        \begin{column}{0.48\textwidth}
-            \textbf{Vulnérabilité} : \textit{Use-After-Free}
-            \begin{itemize}
-                \item Accès mémoire après \texttt{free}.
-                \item \textbf{Cible} : Pointeur \texttt{fd} (Tcache).
-            \end{itemize}
-        \end{column}
-        \begin{column}{0.48\textwidth}
-            \textbf{Concept : Poisoning}
-            \begin{itemize}
-                \item Forcer \texttt{malloc} à retourner une adresse arbitraire (\textit{Target}).
-            \end{itemize}
-        \end{column}
-    \end{columns}
-    \vspace{0.2em}
+    \begin{minipage}[t]{0.56\textwidth}
+        \vspace{0pt}
+        \begin{ccode}
+            intptr_t *p = malloc(0x80); free(p);
+            // p est dans le Tcache
 
-    \begin{ccode}
-        void *p = malloc(0x20); free(p);
-        // p est dans le Tcache libéré
-        *(long*)p = target_addr; 
-        // fd corrompu -> liste détournée
-        
-        malloc(0x20);           // Retourne p
-        void *v = malloc(0x20); // Retourne target_addr !
-    \end{ccode}
-    \vspace{0.1em}
+            // Corruption de 'fd' (Safe Linking)
+            *p = (intptr_t)((long)target ^ ((long)p >> 12));
 
-    \begin{pwndbg}[tcachebins]{text}
-        tcachebins
-        0x20 [  2]: 0x5...010 @\textcolor{pwndbgblue}{->}@ @\textcolor{pwndbgred}{0xdeadbeef}@ (Target)
-    \end{pwndbg}
+            malloc(0x80); // Retourne p
+            
+            // Le prochain retourne notre cible !
+            void *v = malloc(0x80); 
+        \end{ccode}
+
+        \vspace{0.5em}
+        \begin{tikzpicture}[
+            box/.style={rectangle, draw=black, thick, minimum width=1.1cm, minimum height=4mm, align=center, font=\tiny, fill=white},
+            arrow/.style={-Stealth, thick, chunkFd}
+        ]
+            % Avant ligne 7
+            \node[font=\tiny\bfseries, anchor=west] at (-0.8, 0) {Avant \texttt{malloc} (L7) :};
+            \node[box] (tc1) at (2.0, 0) {Tcache};
+            \node[box] (p1) at (3.5, 0) {p};
+            \node[box, draw=chunkSize, text=chunkSize] (t1) at (5.0, 0) {target};
+            \draw[arrow] (tc1) -- (p1);
+            \draw[-Stealth, thick, red, dashed] (p1) -- (t1);
+
+            % Après ligne 9
+            \node[font=\tiny\bfseries, anchor=west] at (-0.8, -0.8) {Avant \texttt{malloc} (L10) :};
+            \node[box] (tc2) at (2.0, -0.8) {Tcache};
+            \node[box, draw=chunkSize, text=chunkSize] (t2) at (3.5, -0.8) {target};
+            \draw[-Stealth, thick, red] (tc2) -- (t2);
+        \end{tikzpicture}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}[t]{0.42\textwidth}
+        \vspace{0pt}
+        \centering
+        \textbf{Chunk Tcache}
+        \vspace{0.8em}
+
+        \begin{tikzpicture}[
+            cell/.style={rectangle, draw=black, thick, minimum width=1.45cm, minimum height=6mm, align=center, font=\tiny},
+            scale=0.85, transform shape
+        ]
+            % Ligne 1
+            \node[cell, fill=chunkPrevSize!20] (prev) at (0,0) {prev\_size};
+            \node[cell, fill=chunkSize!20, right=0mm of prev] (size) {size};
+
+            % Ligne 2
+            \node[cell, fill=chunkFd!40, draw=chunkSize, thick, below=0mm of prev] (fd) {\textbf{target}};
+            \node[cell, fill=chunkBk!20, right=0mm of fd] (key) {key};
+                        
+            \node[below=0.2cm of fd, xshift=0.7cm, font=\tiny\itshape, text=chunkSize] {Pointeur 'fd' corrompu};
+        \end{tikzpicture}
+    \end{minipage}
 \end{frame}
 
 \begin{frame}[fragile]{Défense : Safe Linking (GLIBC 2.32+)}
@@ -730,36 +755,70 @@
 \end{frame}
 
 \begin{frame}[fragile]{Double Free : Fastbin Dup}
-    \begin{columns}[T]
-        \begin{column}{0.48\textwidth}
-            \textbf{Vulnérabilité}
-            \begin{itemize}
-                \item \texttt{free($A \rightarrow B \rightarrow A$)} en Fastbins.
-            \end{itemize}
-        \end{column}
-        \begin{column}{0.48\textwidth}
-            \textbf{Conséquence}
-            \begin{itemize}
-                \item Boucle pour Arbitrary Write.
-            \end{itemize}
-        \end{column}
-    \end{columns}
-    \vspace{0.2em}
+    \begin{minipage}[t]{0.56\textwidth}
+        \vspace{0pt}
+        \begin{ccode}
+            long *a = calloc(0x20); long *b = calloc(0x20);
+            free(a); free(b); free(a);
 
-    \begin{ccode}
-        long *a = calloc(0x20); long *b = calloc(0x20);
-        free(a); free(b); free(a);
+            long *c = calloc(0x20); // Bloc A
+            long *d = calloc(0x20); // Bloc B
+            long *e = calloc(0x20); // Bloc A (Double pointer)
+        \end{ccode}
 
-        long *c = calloc(0x20); // Bloc A
-        long *d = calloc(0x20); // Bloc B
-        long *e = calloc(0x20); // Bloc A (Contrôle B)
-    \end{ccode}
-    \vspace{0.2em}
+        \vspace{0.6em}
+        \begin{tikzpicture}[
+            box/.style={rectangle, draw=black, thick, minimum width=0.8cm, minimum height=4mm, align=center, font=\tiny, fill=white},
+            arrow/.style={-Stealth, thick, chunkFd}
+        ]
+            % Avant ligne 4
+            \node[font=\tiny\bfseries, anchor=west] at (-0.8, 0) {Ligne 3 :};
+            \node[box] (fb) at (1.5, 0) {Fastbin};
+            \node[box] (A1) at (2.7, 0) {A};
+            \node[box] (B)  at (3.7, 0) {B};
+            \node[box, draw=red, text=red] (A2) at (4.7, 0) {A};
+            \draw[arrow] (fb) -- (A1);
+            \draw[arrow] (A1) -- (B);
+            \draw[-Stealth, thick, red] (B) -- (A2) node[midway, below, font=\tiny] {};
 
-    \begin{pwndbg}[bins]{text}
-        fastbins
-        0x20: 0x5...93e0 @\textcolor{pwndbgblue}{->}@ 0x5...9400 @\textcolor{pwndbgblue}{<-}@ @\textcolor{pwndbgred}{0x5...93e0 (loop)}@
-    \end{pwndbg}
+            % Après ligne 6
+            \node[font=\tiny\bfseries, anchor=west] at (-0.8, -0.9) {Ligne 6 :};
+            \node[box] (c) at (1.5, -0.7) {c};
+            \node[box] (e) at (1.5, -1.2) {e};
+            \node[box, fill=chunkSize!10, minimum height=7mm, minimum width=1.2cm] (A) at (3.5, -0.95) {Bloc A};
+            \draw[arrow] (c.east) -- (A.west);
+            \draw[arrow] (e.east) -- (A.west);
+        \end{tikzpicture}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}[t]{0.42\textwidth}
+        \vspace{0pt}
+        \centering
+        \textbf{Fastbin Dup (Boucle)}
+        \vspace{0.8em}
+
+        \begin{tikzpicture}[
+            cell/.style={rectangle, draw=black, thick, minimum width=1.45cm, minimum height=6mm, align=center, font=\tiny},
+            scale=0.85, transform shape
+        ]
+            % Chunk A
+            \node[cell, fill=chunkPrevSize!20] (prevA) at (0,0) {prev\_size};
+            \node[cell, fill=chunkSize!20, right=0mm of prevA] (sizeA) {size};
+            \node[cell, fill=chunkFd!40, draw=chunkSize, thick, below=0mm of prevA] (fdA) {\textbf{fd} = B};
+            \node[cell, fill=chunkBk!20, right=0mm of fdA] (keyA) {bk};
+            \node[right=0.2cm of sizeA, font=\tiny\bfseries] {Bloc A};
+
+            % Chunk B
+            \node[cell, fill=chunkPrevSize!20, below=0.8cm of fdA.south west, anchor=north west] (prevB) {prev\_size};
+            \node[cell, fill=chunkSize!20, right=0mm of prevB] (sizeB) {size};
+            \node[cell, fill=chunkFd!40, draw=chunkSize, thick, below=0mm of prevB] (fdB) {\textbf{fd} = A};
+            \node[cell, fill=chunkBk!20, right=0mm of fdB] (keyB) {bk};
+            \node[right=0.2cm of sizeB, font=\tiny\bfseries] {Bloc B};
+            % Boucle à gauche (angles droits)
+            \draw[-Stealth, thick, chunkFd] (fdA.west) -- ++(-0.7, 0) |- (prevB.west) node[pos=0.75, below, font=\tiny\bfseries] {A $\to$ B};
+            \draw[-Stealth, thick, red] (fdB.west) -- ++(-0.9, 0) |- (prevA.west) node[pos=0.8, above, font=\tiny\bfseries] {B $\to$ A};
+        \end{tikzpicture}
+    \end{minipage}
 \end{frame}
 
 \begin{frame}[fragile]{Heap Overflow \& Overlapping}
