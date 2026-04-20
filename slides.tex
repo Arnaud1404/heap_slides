@@ -278,10 +278,10 @@
                   dans la même bin
 
             \item \textbf{fd\_nextsize} : pointeur vers le prochain chunk
-                  \emph{de même taille}
+                  \emph{de taille différente}
 
             \item \textbf{bk\_nextsize} : pointeur vers le chunk précédent
-                  \emph{de même taille}
+                  \emph{de taille différente}
 
         \end{itemize}
 
@@ -809,78 +809,9 @@
     \end{ccode}
 \end{frame}
 
-\begin{frame}[fragile]{Largebin attack(2 /3)}
-    \begin{ccode}
-        int main(){
-                size_t *p1 = malloc(0x428), *g1 = malloc(0x18);
-                size_t *p2 = malloc(0x418), *g2 = malloc(0x18);
+\section{Défenses et Perspectives (4 min)}
 
-                free(p1);
-                size_t *g3 = malloc(0x438);
-                free(p2);
-
-            }
-    \end{ccode}
-
-    \begin{tikzpicture}[
-        bin/.style={
-                rectangle, draw=black, thick,
-                minimum width=3.2cm,
-                minimum height=1cm,
-                align=center
-            },
-        chunk/.style={
-                rectangle, draw=black, thick,
-                minimum width=2.6cm,
-                minimum height=7mm,
-                align=center
-            },
-        fdarrow/.style={-{Latex[length=3mm]}, thick, blue},
-        nextarrow/.style={-{Latex[length=3mm]}, thick, dashed, red},
-        prevarrow/.style={-{Latex[length=3mm]}, thick, dashed, orange},
-        every node/.style={font=\small}
-        ]
-
-        % Bins
-        \visible<2-3>{\node[bin] (bin64) at (0,0) {Largebin 64\\0x400–0x4FF};}
-        \visible<1,3>{\node[bin, below=1.2cm of bin64] (unsorted) {Unsortedbin};}
-
-        % état intermédiare 1
-        \visible<1>{\node[chunk, right=1cm of unsorted] (p1) {p1 : 0x428};}
-        \visible<1>{\node[chunk, right=1cm of p1] (arena) {Arena};}
-
-        \visible<1>{\draw[fdarrow] (p1.east) -- (arena.west);}
-
-
-        % état intermédiare 2
-        \visible<2>{
-            \node[chunk, right=1cm of bin64] (p1) {p1 : 0x428};
-        }
-
-        % fd_nextsize : boucle à droite
-        \visible<2->{
-            \draw[nextarrow] (p1.east)
-            .. controls +(0.8,0.6) and +(0.8,-0.6)
-            .. (p1.east);
-        }
-
-        % bk_nextsize : boucle à gauche
-        \visible<2->{
-            \draw[prevarrow] (p1.west)
-            .. controls +(-0.8,0.6) and +(-0.8,-0.6)
-            .. (p1.west);
-        }
-
-
-        % état final
-        \visible<3>{\node[chunk, right=1cm of bin64] (p1) {p1 : 0x428};}
-        \visible<3>{\node[chunk, right=1cm of unsorted] (p2) {p2 : 0x418};}
-        \visible<3>{\node[chunk, right=1cm of p2] (arena) {Arena};}
-
-        \visible<3>{\draw[fdarrow] (p2.east) -- (arena.west);}
-
-    \end{tikzpicture}
-
+\begin{frame}{ASLR et Fuite d'Adresses (Leaks)}
 \end{frame}
 
 
