@@ -149,13 +149,13 @@
 
 \begin{document}
 
-\begin{frame}
+\begin{frame}[plain]
     \titlepage
 \end{frame}
 
 \section{Introduction et Fondamentaux (4 min)}
 
-\begin{frame}{Plan}
+\begin{frame}[plain]{Plan}
 
     \begin{itemize}
         \item Fonctionnement de malloc
@@ -165,7 +165,7 @@
 \end{frame}
 
 
-\begin{frame}{C'est quoi malloc(1 /3)}
+\begin{frame}[plain]{C'est quoi malloc(1 /3)}
 
     \begin{center}
         \begin{tikzpicture}[
@@ -204,7 +204,7 @@
     \end{center}
 
 \end{frame}
-\begin{frame}{C'est quoi malloc(2 /3)}
+\begin{frame}[plain]{C'est quoi malloc(2 /3)}
 
     \begin{minipage}{0.40\textwidth}
         \begin{tikzpicture}[
@@ -247,7 +247,7 @@
 
 \end{frame}
 
-\begin{frame}{C'est quoi malloc(3 /3)}
+\begin{frame}[plain]{C'est quoi malloc(3 /3)}
 
     \begin{minipage}{0.40\textwidth}
         \begin{tikzpicture}[
@@ -301,10 +301,10 @@
                   dans la même bin
 
             \item \textbf{fd\_nextsize} : pointeur vers le prochain chunk
-                  \emph{de même taille}
+                  \emph{de taille différente}
 
             \item \textbf{bk\_nextsize} : pointeur vers le chunk précédent
-                  \emph{de même taille}
+                  \emph{de taille différente}
 
         \end{itemize}
 
@@ -314,7 +314,7 @@
 
 
 
-\begin{frame}{Tcache}
+\begin{frame}[plain]{Tcache}
 
     \begin{minipage}{0.40\textwidth}
 
@@ -354,7 +354,7 @@
 
 \end{frame}
 
-\begin{frame}{Fastbins}
+\begin{frame}[plain]{Fastbins}
 
     \begin{minipage}{0.40\textwidth}
 
@@ -397,7 +397,7 @@
 
 \end{frame}
 
-\begin{frame}{Unsorted bin}
+\begin{frame}[plain]{Unsorted bin}
 
     \begin{minipage}{0.40\textwidth}
 
@@ -425,8 +425,8 @@
         \textbf{Unsorted bin :}
 
         \begin{itemize}
-            \item Liste \textbf{doublement chaînée FIFO} pour retirer efficassemnt
-                  en millieu de liste
+            \item Liste \textbf{doublement chaînée FIFO} pour retirer efficacement
+                  en milieu de liste
             \item Contient les chunks fraîchement libérés
             \item Sert de point d’entrée pour redispatcher vers smallbins et largebins
         \end{itemize}
@@ -435,7 +435,7 @@
 
 \end{frame}
 
-\begin{frame}{Smallbins}
+\begin{frame}[plain]{Smallbins}
 
     \begin{minipage}{0.40\textwidth}
 
@@ -478,7 +478,8 @@
 
 \end{frame}
 
-\begin{frame}{Largebins}
+
+\begin{frame}[plain]{Largebins}
 
     \begin{minipage}{0.40\textwidth}
 
@@ -495,8 +496,8 @@
             \node[cell, fill=chunkFd!20] (Afd) at (0,0) {fd};
             \node[cell, fill=chunkBk!20, right=0mm of Afd] (Abk) {bk};
 
-            \node[cell, fill=chunkFdNext!20, below=0.1cm of Afd] (Afdn) {fd\_next};
-            \node[cell, fill=chunkBkNext!20, right=0mm of Afdn] (Abkn) {bk\_next};
+            \node[cell, fill=chunkFdNext!20, below=0.1cm of Afd] (Afdn) {fd\_nextsize};
+            \node[cell, fill=chunkBkNext!20, right=0mm of Afdn] (Abkn) {bk\_nextsize};
 
             \node[above=0.4cm,font=\bfseries] at ($(Afd)!0.5!(Abk)$) {Largebin};
 
@@ -517,7 +518,7 @@
 
 \end{frame}
 
-\begin{frame}{Exemple largebins}
+\begin{frame}[plain]{Exemple largebins}
 
     \begin{tikzpicture}[
         bin/.style={
@@ -625,16 +626,12 @@
         \end{column}
     \end{columns}
     \vspace{0.2em}
-    <<<<<<< HEAD
 
-    =======
-
-    >>>>>>> f8d4c2014903de7eabe1d81cd7525fd1a799d035
     \begin{ccode}
-        long *a = malloc(0x20); free(a); // 'a' dans Tcache
-        *a = 0xdeadbeef;                 // UAF : fd corrompu !
-        malloc(0x20);                    // Dépile 'a'
-        long *target = malloc(0x20);     // Ciblera 0xdeadbeef !
+        long *a = malloc(0x20); free(a); // Tcache[0x20] -> a
+        *a = 0xdeadbeef;                 // UAF écrase fd: Tcache -> a -> 0xdeadbeef
+        malloc(0x20);                    // Dépile 'a', Tcache -> 0xdeadbeef
+        long *target = malloc(0x20);     // malloc alloue à l'adresse 0xdeadbeef !
     \end{ccode}
     \vspace{0.2em}
 
@@ -644,7 +641,7 @@
     \end{pwndbg}
 \end{frame}
 
-\begin{frame}[fragile]{Use-After-Free (UAF) \& Safe Linking (2/3)}
+\begin{frame}[plain,fragile]{Use-After-Free (UAF) \& Safe Linking (2/3)}
     \textbf{Mitigation : Safe Linking (GLIBC 2.32+)}
     \begin{itemize}
         \item Masquage cryptographique du Tcache Poisoning aveugle.
@@ -673,7 +670,7 @@
     \end{columns}
 \end{frame}
 
-\begin{frame}[fragile]{Use-After-Free (UAF) \& Safe Linking (3/3)}
+\begin{frame}[plain,fragile]{Use-After-Free (UAF) \& Safe Linking (3/3)}
     \textbf{Inversion algorithmique (XOR-shift)}
     \vspace{-0.5em}
     \begin{center}
@@ -728,7 +725,7 @@
     \end{center}
 \end{frame}
 
-\begin{frame}[fragile]{Double Free : Fastbin Dup}
+\begin{frame}[plain,fragile]{Double Free : Fastbin Dup}
     \begin{columns}[T]
         \begin{column}{0.48\textwidth}
             \textbf{Vulnérabilité}
@@ -761,7 +758,7 @@
     \end{pwndbg}
 \end{frame}
 
-\begin{frame}[fragile]{Heap Overflow \& Overlapping}
+\begin{frame}[plain,fragile]{Heap Overflow \& Overlapping}
     \begin{columns}[T]
         \begin{column}{0.48\textwidth}
             \textbf{Mécanisme} (Cible : \texttt{size})
@@ -777,14 +774,9 @@
         \end{column}
     \end{columns}
     \vspace{-0.5em}
-    <<<<<<< HEAD
-
-    =======
-
-    >>>>>>> f8d4c2014903de7eabe1d81cd7525fd1a799d035
     \begin{ccode}
         long *p1 = malloc(0x80-8); long *p2 = malloc(0x500-8);
-        long *p3 = malloc(0x80-8); malloc(0x10); // guard
+        long *p3 = malloc(0x80-8); malloc(0x10); // Chunk de garde
 
         *(p2 - 1) = 0x581; // OVERFLOW (fake_size = 0x500 + 0x80 + 1)
         free(p2); // p2 dans l'Unsorted Bin avec fausse taille
@@ -798,16 +790,12 @@
         0x5...000 0x0...081 (p1)
         @\makebox[0pt][l]{\fboxsep=0pt\color{red}\fbox{\phantom{0x5...080}}}0x5...080@ @\textcolor{pwndbgred}{0x0...581}@ (p2 corrompu, taille fake 0x580)
         0x5...580 0x0...081 (p3 désormais inclus dans p4)
-        <<<<<<< HEAD
         ...
-        =======
-        ...
-        >>>>>>> f8d4c2014903de7eabe1d81cd7525fd1a799d035
         0x5...600 0x3434343434343434 (p4 et p3 partagent cette zone)
     \end{pwndbg}
 \end{frame}
 
-\begin{frame}[fragile]{Exploitation Applicative : Type Confusion}
+\begin{frame}[plain,fragile]{Exploitation Applicative : Type Confusion}
     \begin{columns}[T]
         \begin{column}{0.48\textwidth}
             \textbf{Le Pivot Applicatif}
@@ -824,11 +812,6 @@
         \end{column}
     \end{columns}
     \vspace{0.2em}
-    <<<<<<< HEAD
-
-    =======
-
-    >>>>>>> f8d4c2014903de7eabe1d81cd7525fd1a799d035
     \begin{ccode}
         typedef struct { void (*execute)(); } task_t; // 8 octets
         typedef struct { char content[8]; } msg_t;    // 8 octets
@@ -837,11 +820,12 @@
         free(task); // UAF: dangling pointer !
 
         msg_t *msg = malloc(sizeof(msg_t)); // Allocation même taille
-        *(long *)msg->content = (long)win;  // Type Confusion
+        *(long *)msg->content = (long)win;  // Confusion de type
 
         task->execute(); // Exécute win() !
     \end{ccode}
 \end{frame}
+
 
 \begin{frame}[fragile]{Largebin attack(1 /3)}
     \begin{ccode}
@@ -976,7 +960,7 @@
         % ===========================
         \node[bin] (bin64) at (0,0) {Largebin 64\\0x400–0x4FF};
         \visible<1-2>{\node[chunk, above=0.8cm of p1] (target) {target};}
-        \visible<1-2>{\node[bin, below=1.2cm of bin64] (unsorted) {Unsortedbin};}
+        \visible<1-2>{\node[bin, below=0.8cm of bin64] (unsorted) {Unsortedbin};}
 
         % ===========================
         % SLIDE 1–2 : état avant attaque
@@ -1056,7 +1040,7 @@
 \section{Défenses et Perspectives (4 min)}
 
 
-\begin{frame}{Évolutions : GLIBC 2.42 \& 2.43}
+\begin{frame}[plain]{Évolutions : GLIBC 2.42 \& 2.43}
     \textbf{GLIBC 2.42 (Août 2025)}
     \vspace{-0.2cm}
     \begin{itemize}
@@ -1075,7 +1059,7 @@
     \end{itemize}
 \end{frame}
 
-\begin{frame}[fragile]{Conclusion}
+\begin{frame}[plain,fragile]{Conclusion}
     \textbf{Le crépuscule des métadonnées ?}
     \vspace{-0.2cm}
     \begin{itemize}
