@@ -514,7 +514,7 @@
 \end{frame}
 
 
-\begin{frame}{Largebins : sous-bins et insertion}
+\begin{frame}{Exemple largebins}
 
     \begin{tikzpicture}[
         bin/.style={
@@ -529,36 +529,62 @@
                 minimum height=7mm,
                 align=center
             },
-        arrow/.style={-{Latex[length=3mm]}, thick},
+        fdarrow/.style={-{Latex[length=3mm]}, thick, blue},
+        nextarrow/.style={-{Latex[length=3mm]}, thick, dashed, red},
         every node/.style={font=\small}
         ]
 
         % ===========================
         % Sous-bins (VERTICAUX)
         % ===========================
-        \node[bin] (bin63) at (0,0) {Sous-bin 63\\0x400–0x4FF};
-        \node[bin, below=1.2cm of bin63] (bin64) {Sous-bin 64\\0x500–0x5FF};
-        \node[bin, below=1.2cm of bin64] (bin65) {Sous-bin 65\\0x600–0x6FF};
+        \node[bin] (bin64) at (0,0) {Sous-bin 64\\0x500–0x5FF};
+        \node[bin, below=1.2cm of bin64] (bin63) {Sous-bin 63\\0x400–0x4FF};
+        \node[bin, below=1.2cm of bin63] (bin64b) {Sous-bin 64\\0x500–0x5FF};
 
         % ===========================
-        % Chunks déjà présents
+        % Chunks
         % ===========================
-        \node[chunk, right=1.5cm of bin63] (B) {B : 0x480};
-        \node[chunk, right=1.5cm of bin64] (A) {A : 0x500};
+        \node[chunk, right=1.5cm of bin63] (A) {A : 0x480};
+        \node[chunk, right=1.5cm of bin64] (B) {B : 0x520};
+        \node[chunk, right=1.5cm of bin64b] (C) {C : 0x580};
 
         % ===========================
-        % Nouveau chunk D
+        %  boucles
         % ===========================
-        \node[chunk, right=1.5cm of bin65] (D) {D : 0x600};
+        \visible<2-3>{\draw[nextarrow] (A.east) .. controls +(0.8,0.6) and +(0.8,-0.6) .. (A.east);}
+        \visible<2>{\draw[nextarrow] (B.east) .. controls +(0.8,0.6) and +(0.8,-0.6) .. (B.east);}
+        \visible<3>{\draw[nextarrow] (C.south) .. controls +(0.6,-0.8) and +(-0.6,-0.8) .. (C.south);}
 
         % ===========================
-        % Flèche d'insertion
+        % fd(B→A)
         % ===========================
-        \draw[arrow] (D.west) -- (bin65.east);
+        \visible<2->{\draw[fdarrow] (B.south) -- ++(0,-0.4) -| (A.north);}
+
+        % ===========================
+        %  fd_nextsize(B→C) remplace la boucle de B
+        % ===========================
+        \visible<3->{\draw[nextarrow] (B.east) -- ++(0.8,0) |- (C.east);}
+
+        % ===========================
+        % fd(A→C)
+        % ===========================
+        \visible<3->{\draw[fdarrow] (A.south) -- ++(0,-0.4) -| (C.north);}
+
+        % ===========================
+        % LÉGENDE
+        % ===========================
+        \node[anchor=west] at (7,-1.8) {\textbf{Légende :}};
+        \draw[fdarrow] (7,-2.3) -- ++(0.8,0);
+        \node[anchor=west] at (8,-2.3) {fd};
+
+        \draw[nextarrow] (7,-2.7) -- ++(0.8,0);
+        \node[anchor=west] at (8,-2.7) {fd\_nextsize};
 
     \end{tikzpicture}
 
 \end{frame}
+
+
 
 
 
