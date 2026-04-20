@@ -18,7 +18,7 @@
 \usepackage{minted}
 \setminted{
     style=xcode,
-    fontsize=\scriptsize,
+    fontsize=\tiny,
     breaklines=true,
     breakanywhere=true,
     linenos=true,
@@ -32,7 +32,7 @@
 }
 \AtBeginEnvironment{minted}{\color{black}}
 \AtBeginEnvironment{frame}{\small}
-\renewcommand{\theFancyVerbLine}{\textcolor{black}{\scriptsize\arabic{FancyVerbLine}}}
+\renewcommand{\theFancyVerbLine}{\textcolor{black}{\tiny\arabic{FancyVerbLine}}}
 
 % --- tcolorbox (pour ccode & pwndbg) ---
 \usepackage[breakable]{tcolorbox}
@@ -44,6 +44,7 @@
 
 % --- Couleurs personnalisées ---
 \usepackage{xcolor}
+\usepackage{multicol}
 % (tes definecolor ici)
 
 % ----- Couleurs pour l'analyse des chunks Heap (Optimisées LCD/DLP) -----
@@ -64,7 +65,7 @@
     minted style=xcode,
     minted language=c,
     minted options={
-        fontsize=\scriptsize,
+        fontsize=\tiny,
         breaklines,
         breakanywhere,
         autogobble,
@@ -99,7 +100,7 @@
     listing engine=minted,
     minted style=xcode,
     minted language=#2,
-    minted options={fontsize=\scriptsize, breaklines, escapeinside=@@},
+    minted options={fontsize=\tiny, breaklines, escapeinside=@@},
     colback=white,
     colframe=black, % Contraste max
     colupper=black,
@@ -108,7 +109,7 @@
     left=6pt, right=4pt, top=4pt, bottom=4pt,
     drop shadow=black!30!white,
     title={\textcolor{pwndbgred}{\textbf{pwndbg>}} \texttt{#1}},
-    fonttitle=\bfseries\ttfamily\scriptsize,
+    fonttitle=\bfseries\ttfamily\tiny,
     coltitle=black,
     colbacktitle=gray!20,
     listing only,
@@ -685,7 +686,7 @@
                     arrow/.style={-Stealth, thick},
                     cascade/.style={-Stealth, red!80!black, dashed, line width=0.8pt},
                     separator/.style={gray!30, dashed, line width=0.5pt},
-                    label/.style={font=\sffamily\scriptsize\bfseries}
+                    label/.style={font=\sffamily\tiny\bfseries}
                 ]
 
                 \node[bitbox, cipher] (C1) at (0, 0) {$P_{63:52} \oplus 0$};
@@ -710,7 +711,7 @@
                     }
 
                 \draw[cascade] (P1.east) -| (M2.south)
-                node[pos=0.5, below, font=\scriptsize\bfseries, text=red!80!black] {$\gg 12$};
+                node[pos=0.5, below, font=\tiny\bfseries, text=red!80!black] {$\gg 12$};
 
                 \draw[separator] (1.75, 0.6) -- (1.75, -3.2);
                 \draw[separator] (6.5, 0.6) -- (6.5, -3.2);
@@ -789,43 +790,11 @@
     \begin{pwndbg}[heap]{text}
         0x5...000 0x0...081 (p1)
         @\makebox[0pt][l]{\fboxsep=0pt\color{red}\fbox{\phantom{0x5...080}}}0x5...080@ @\textcolor{pwndbgred}{0x0...581}@ (p2 corrompu, taille fake 0x580)
-        0x5...580 0x0...081 (p3 désormais inclus dans p4)
+        0x5...580 0x0...081 (p3 écrasé par p4)
         ...
-        0x5...600 0x3434343434343434 (p4 et p3 partagent cette zone)
+        0x5...600 0x3434343434343434 (overwritten)
     \end{pwndbg}
 \end{frame}
-
-\begin{frame}[plain,fragile]{Exploitation Applicative : Type Confusion}
-    \begin{columns}[T]
-        \begin{column}{0.48\textwidth}
-            \textbf{Le Pivot Applicatif}
-            \begin{itemize}
-                \item GLIBC ignorée.
-                \item Cible : Logique interne du programme.
-            \end{itemize}
-        \end{column}
-        \begin{column}{0.48\textwidth}
-            \textbf{Avantage Majeur}
-            \begin{itemize}
-                \item Aucune sécurité type \textit{Safe Linking}.
-            \end{itemize}
-        \end{column}
-    \end{columns}
-    \vspace{0.2em}
-    \begin{ccode}
-        typedef struct { void (*execute)(); } task_t; // 8 octets
-        typedef struct { char content[8]; } msg_t;    // 8 octets
-
-        task_t *task = malloc(sizeof(task_t)); task->execute = lose;
-        free(task); // UAF: dangling pointer !
-
-        msg_t *msg = malloc(sizeof(msg_t)); // Allocation même taille
-        *(long *)msg->content = (long)win;  // Confusion de type
-
-        task->execute(); // Exécute win() !
-    \end{ccode}
-\end{frame}
-
 
 \begin{frame}[fragile]{Largebin attack(1 /3)}
     \begin{ccode}
@@ -1040,13 +1009,46 @@
 \section{Défenses et Perspectives (4 min)}
 
 
+\begin{frame}[plain,fragile]{Exploitation Applicative : Type Confusion}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \textbf{Le Pivot Applicatif}
+            \begin{itemize}
+                \item GLIBC ignorée.
+                \item Cible : Logique interne du programme.
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \textbf{Avantage Majeur}
+            \begin{itemize}
+                \item Aucune sécurité type \textit{Safe Linking}.
+            \end{itemize}
+        \end{column}
+    \end{columns}
+    \vspace{0.2em}
+    \begin{ccode}
+        typedef struct { void (*execute)(); } task_t; // 8 octets
+        typedef struct { char content[8]; } msg_t;    // 8 octets
+
+        task_t *task = malloc(sizeof(task_t)); task->execute = lose;
+        free(task); // UAF: dangling pointer !
+
+        msg_t *msg = malloc(sizeof(msg_t)); // Allocation même taille
+        *(long *)msg->content = (long)win;  // Confusion de type
+
+        task->execute(); // Exécute win() !
+    \end{ccode}
+\end{frame}
+
+
+
 \begin{frame}[plain]{Évolutions : GLIBC 2.42 \& 2.43}
     \textbf{GLIBC 2.42 (Août 2025)}
     \vspace{-0.2cm}
     \begin{itemize}
         \item Cohérence exigée à l'insertion en \textit{Unsorted} / \textit{Largebins}.
         \item \textbf{Cible} : Neutralisation des \textit{Largebin Attacks}.
-        \item Règle stricte bilatérale : \texttt{P->fd\_nextsize->bk\_nextsize == P}
+        \item Vérification d'intégrité : \texttt{P->bk\_nextsize->fd\_nextsize == P}
     \end{itemize}
     \vspace{0.1cm}
 
@@ -1059,23 +1061,20 @@
     \end{itemize}
 \end{frame}
 
-\begin{frame}[plain,fragile]{Conclusion}
-    \textbf{Le crépuscule des métadonnées ?}
-    \vspace{-0.2cm}
-    \begin{itemize}
-        \item Durcissements successifs : \textit{Safe Linking}, vérifications croisées (\texttt{nextsize}).
-        \item Disparition des listes peu protégées (\textit{Fastbins}).
-        \item Arbitrary Write devient coûteux (multiples fuites nécessaires : `heap`, `libc`).
-    \end{itemize}
-    \vspace{0.4cm}
 
-    \textbf{Pivot vers la corruption applicative}
-    \vspace{-0.2cm}
+\begin{frame}[plain]{Bibliographie}
+    \scriptsize
     \begin{itemize}
-        \item Les défenses modernes protègent la machinerie GLIBC, pas la logique métier.
-        \item \textbf{Data-Only Attacks} : Attaquer directement les structures adjacentes (privilèges, états).
-        \item \texttt{malloc} n'est plus la cible, mais l'outil.
+        \item \textbf{Investigation x64 GLIBC Heap} (Rørvik) -- \url{https://www.scribd.com/document/555969660/HeapExplotationx64GlibC}
+        \item \textbf{GLIBC Release Notes} -- \url{https://sourceware.org/glibc/wiki/Release}
+        \item \textbf{how2heap} (Shellphish Group) -- \url{https://github.com/shellphish/how2heap}
+        \item \textbf{pwndbg} \& \textbf{pwntools} -- \url{https://github.com/pwndbg/pwndbg}, \url{https://github.com/Gallopsled/pwntools}
+        \item \textbf{Azeria Labs} (Free Bins) -- \url{https://azeria-labs.com/heap-exploitation-part-2-glibc-heap-free-bins/}
+        \item \textbf{Hackndo} (Use-After-Free) -- \url{https://beta.hackndo.com/use-after-free/}
+        \item \textbf{HackTricks} (Double Free) -- \url{https://hacktricks.wiki/en/binary-exploitation/libc-heap/double-free.html}
+        \item \textbf{Nightmare: Grooming} (guyinatuxedo) -- \url{https://guyinatuxedo.github.io/26-heap_grooming/explanation_heap_grooming/index.html}
+        \item \textbf{Intro To GLIBC Heap} (Kamper) -- \url{https://www.youtube.com/watch?v=6-Et7M7qJJg}
+        \item \textbf{Heap Exploitation Intro} (LiveOverflow) -- \url{https://www.youtube.com/watch?v=EhmZvyNA-1A}
     \end{itemize}
 \end{frame}
-
 \end{document}
