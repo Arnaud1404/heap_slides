@@ -256,8 +256,44 @@
 
 \begin{frame}{Dans un processus}
 
-    pas de heap utilisateurs
-    brk()
+            % Ligne 3
+            \node[cell, anchor=west, fill=chunkFdNext!20]
+            (fdn) at ($(fd.south west)+(0,-\chunkh)$) {fd\_nextsize};
+            \node[cell, anchor=west, fill=chunkBkNext!20]
+            (bkn) at ([xshift=0mm]fdn.east) {bk\_nextsize};
+
+            % Ligne 4 (payload)
+            \node[cell, anchor=west, fill=chunkPayload!20, minimum width=5cm]
+            (payload) at ($(fdn.south west)+(0,-\chunkh)$) {payload};
+
+            % Titre centré
+            \node[above=0.4cm,font=\bfseries] at ($(prev)!0.5!(size)$) {Chunk libre};
+
+        \end{tikzpicture}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.50\textwidth}
+
+        \textbf{Champs supplémentaires dans un chunk libre :}
+
+        \vspace{2mm}
+
+        \begin{itemize}
+            \item \textbf{fd} : pointeur vers le prochain chunk libre
+                  dans la même bin
+
+            \item \textbf{bk} : pointeur vers le chunk libre précédent
+                  dans la même bin
+
+            \item \textbf{fd\_nextsize} : pointeur vers le prochain chunk
+                  \emph{de taille différente}
+
+            \item \textbf{bk\_nextsize} : pointeur vers le chunk précédent
+                  \emph{de taille différente}
+
+        \end{itemize}
+
+    \end{minipage}
 
 \end{frame}
 
