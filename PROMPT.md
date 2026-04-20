@@ -45,3 +45,7 @@
 - Ajuster dynamiquement les espacements internes (`\vspace{-0.2em}`, tailles de police, formatage horizontal dans pwndbg) pour tout compacter sans générer d'erreurs de compilation LaTeX.
 - Ne pas utiliser le terme 'aliasing' ou ses dérivés.
 - **Mise en relief visuelle** : Utiliser des rectangles rouges fins pour encadrer les sections de code ou de dump mémoire critiques (ex: `@\makebox[0pt][l]{\fboxsep=0pt\color{red}\fbox{\phantom{TEXT}}}TEXT@`). Ne pas utiliser de fond coloré (`colorbox`) pour préserver l'alignement. L'utiliser avec parcimonie pour attirer l'œil sur le point critique de la slide (ex: offset modifié, fonction détournée).
+
+**Exceptions de dictionnaire (English Dictionary Exception)**
+- Conserver certains termes techniques spécifiques en anglais tels que `fake_size` et `dangling pointer`. Ne pas les traduire en français.
+
