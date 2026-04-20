@@ -156,7 +156,7 @@
 
 \section{Introduction et Fondamentaux (4 min)}
 
-\begin{frame}[plain]{Plan}
+\begin{frame}{Plan}
 
     \begin{itemize}
         \item Fonctionnement de malloc
@@ -166,7 +166,7 @@
 \end{frame}
 
 
-\begin{frame}[plain]{C'est quoi malloc(1 /3)}
+\begin{frame}{Fonctionnement de malloc (1/3)}
 
     \begin{center}
         \begin{tikzpicture}[
@@ -205,7 +205,7 @@
     \end{center}
 
 \end{frame}
-\begin{frame}[plain]{C'est quoi malloc(2 /3)}
+\begin{frame}{Fonctionnement de malloc (2/3)}
 
     \begin{minipage}{0.40\textwidth}
         \begin{tikzpicture}[
@@ -248,7 +248,7 @@
 
 \end{frame}
 
-\begin{frame}[plain]{C'est quoi malloc(3 /3)}
+\begin{frame}{Fonctionnement de malloc (3/3)}
 
     \begin{minipage}{0.40\textwidth}
         \begin{tikzpicture}[
@@ -315,7 +315,7 @@
 
 
 
-\begin{frame}[plain]{Tcache}
+\begin{frame}{Le Tcache}
 
     \begin{minipage}{0.40\textwidth}
 
@@ -355,7 +355,7 @@
 
 \end{frame}
 
-\begin{frame}[plain]{Fastbins}
+\begin{frame}{Les Fastbins}
 
     \begin{minipage}{0.40\textwidth}
 
@@ -398,7 +398,7 @@
 
 \end{frame}
 
-\begin{frame}[plain]{Unsorted bin}
+\begin{frame}{L'Unsorted Bin}
 
     \begin{minipage}{0.40\textwidth}
 
@@ -436,7 +436,7 @@
 
 \end{frame}
 
-\begin{frame}[plain]{Smallbins}
+\begin{frame}{Les Smallbins}
 
     \begin{minipage}{0.40\textwidth}
 
@@ -480,7 +480,7 @@
 \end{frame}
 
 
-\begin{frame}[plain]{Largebins}
+\begin{frame}{Les Largebins}
 
     \begin{minipage}{0.40\textwidth}
 
@@ -519,7 +519,7 @@
 
 \end{frame}
 
-\begin{frame}[plain]{Exemple largebins}
+\begin{frame}{Fonctionnement des Largebins}
 
     \begin{tikzpicture}[
         bin/.style={
@@ -593,16 +593,15 @@
 
 \section{Les techniques d'exploitation}
 
-\begin{frame}{Comment faire un exploit}
-
-    Un exploit = enchaînement de techniques. \\
-    Ces techniques reposent sur \textbf{3 bugs} et sur du \textbf{feng shui}.
+\begin{frame}{Les bases d'un exploit}
 
     \begin{itemize}
-        \item Use After Free (UAF) — oubli de réinitialiser un pointeur
-              après l’avoir libéré
-        \item Double free — libérer un chunk déjà libéré
-        \item Heap overflow — réécrire les données d’un chunk
+        \item Enchaînement de techniques
+        \item \textbf{3 bugs} + \textbf{feng shui}
+        \item \textit{Feng shui} : placement des chunks, ordre des allocations, ordre des frees
+        \item UAF : pointeur gardé après \texttt{free}
+        \item Double free : même chunk libéré deux fois
+        \item Heap overflow : débordement sur le chunk voisin
     \end{itemize}
 
 \end{frame}
@@ -611,68 +610,72 @@
 
 
 
-\begin{frame}[fragile]{Use-After-Free (UAF) \& Safe Linking (1/3)}
+\begin{frame}[fragile]{Use-After-Free (UAF) \& Tcache Poisoning}
     \begin{columns}[T]
         \begin{column}{0.48\textwidth}
             \textbf{Vulnérabilité} : \textit{Use-After-Free}
             \begin{itemize}
-                \item \textbf{Objectif} : Détourner la liste (Tcache).
+                \item Accès mémoire après \texttt{free}.
+                \item \textbf{Cible} : Pointeur \texttt{fd} (Tcache).
             \end{itemize}
         \end{column}
         \begin{column}{0.48\textwidth}
-            \textbf{Conséquence globale}
+            \textbf{Concept : Poisoning}
             \begin{itemize}
-                \item \textit{Arbitrary Write} via \texttt{malloc}.
+                \item Forcer \texttt{malloc} à retourner une adresse arbitraire (\textit{Target}).
             \end{itemize}
         \end{column}
     \end{columns}
     \vspace{0.2em}
 
     \begin{ccode}
-        long *a = malloc(0x20); free(a); // Tcache[0x20] -> a
-        *a = 0xdeadbeef;                 // UAF écrase fd: Tcache -> a -> 0xdeadbeef
-        malloc(0x20);                    // Dépile 'a', Tcache -> 0xdeadbeef
-        long *target = malloc(0x20);     // malloc alloue à l'adresse 0xdeadbeef !
+        void *p = malloc(0x20); free(p);
+        // p est dans le Tcache libéré
+        *(long*)p = target_addr; 
+        // fd corrompu -> liste détournée
+        
+        malloc(0x20);           // Retourne p
+        void *v = malloc(0x20); // Retourne target_addr !
     \end{ccode}
-    \vspace{0.2em}
+    \vspace{0.1em}
 
     \begin{pwndbg}[tcachebins]{text}
         tcachebins
-        0x20 [  2]: 0x5...010 @\textcolor{pwndbgblue}{->}@ @\textcolor{pwndbgred}{0xdeadbeef}@
+        0x20 [  2]: 0x5...010 @\textcolor{pwndbgblue}{->}@ @\textcolor{pwndbgred}{0xdeadbeef}@ (Target)
     \end{pwndbg}
 \end{frame}
 
-\begin{frame}[plain,fragile]{Use-After-Free (UAF) \& Safe Linking (2/3)}
-    \textbf{Mitigation : Safe Linking (GLIBC 2.32+)}
+\begin{frame}[fragile]{Défense : Safe Linking (GLIBC 2.32+)}
+    \textbf{Mitigation : Chiffrement des pointeurs}
     \begin{itemize}
-        \item Masquage cryptographique du Tcache Poisoning aveugle.
+        \item Masquage du Tcache Poisoning "aveugle".
     \end{itemize}
     \vspace{0.1em}
 
     \begin{columns}[T]
         \begin{column}{0.50\textwidth}
-            \textbf{Formule algorithmique}
+            \textbf{Formule de protection}
             \begin{itemize}
                 \item $C = (L \gg 12) \oplus P$
-                \item $L$ : L'adresse stockant le pointeur.
-                \item $P$ : Le vrai pointeur ciblé.
-                \item $C$ : Valeur stockée en RAM.
+                \item $L$ : Adresse de stockage (Leak requis).
+                \item $P$ : Le vrai pointeur (Destination).
+                \item $C$ : Valeur stockée (Mélangée).
             \end{itemize}
         \end{column}
 
         \begin{column}{0.46\textwidth}
-            \textbf{L'impact sur l'attaquant}
+            \textbf{Impact Offensif}
             \begin{itemize}
-                \item Forcer un pointeur provoque un crash (\texttt{SIGSEGV}).
-                \item Protège les allocations.
-                \item \textbf{Nécessite} : Un \textit{Heap Leak}.
+                \item Écrire \textit{brut} une adresse provoque un crash (\texttt{SIGSEGV}).
+                \item Rend les exploits non-déterministes.
+                \item \textbf{Solution} : Fuite (Heap Leak).
             \end{itemize}
         \end{column}
     \end{columns}
 \end{frame}
 
-\begin{frame}[plain,fragile]{Use-After-Free (UAF) \& Safe Linking (3/3)}
-    \textbf{Inversion algorithmique (XOR-shift)}
+\begin{frame}[fragile]{Contre-Mesure : Inversion de Safe Linking}
+    \textbf{Extraction de la clé (XOR-shift recovery)}
     \vspace{-0.5em}
     \begin{center}
         \resizebox{0.95\textwidth}{!}{
@@ -726,7 +729,7 @@
     \end{center}
 \end{frame}
 
-\begin{frame}[plain,fragile]{Double Free : Fastbin Dup}
+\begin{frame}[fragile]{Double Free : Fastbin Dup}
     \begin{columns}[T]
         \begin{column}{0.48\textwidth}
             \textbf{Vulnérabilité}
@@ -759,7 +762,7 @@
     \end{pwndbg}
 \end{frame}
 
-\begin{frame}[plain,fragile]{Heap Overflow \& Overlapping}
+\begin{frame}[fragile]{Heap Overflow \& Overlapping}
     \begin{columns}[T]
         \begin{column}{0.48\textwidth}
             \textbf{Mécanisme} (Cible : \texttt{size})
@@ -796,7 +799,7 @@
     \end{pwndbg}
 \end{frame}
 
-\begin{frame}[fragile]{Largebin attack(1 /3)}
+\begin{frame}[fragile]{Largebin Attack (1/3)}
     \begin{ccode}
         int main(){
                 /* Désactiver le buffering entrée/sortie pour éviter que les flux n’interfèrent avec la heap */
@@ -820,7 +823,7 @@
     \end{ccode}
 \end{frame}
 
-\begin{frame}[fragile]{Largebin attack(2 /3)}
+\begin{frame}[fragile]{Largebin Attack (2/3)}
     \begin{ccode}
         int main(){
                 size_t *p1 = malloc(0x428), *g1 = malloc(0x18);
@@ -895,7 +898,7 @@
 \end{frame}
 
 
-\begin{frame}[fragile]{Largebin attack(3 /3)}
+\begin{frame}[fragile]{Largebin Attack (3/3)}
     \begin{ccode}
         int main()
         {
@@ -1009,7 +1012,7 @@
 \section{Défenses et Perspectives (4 min)}
 
 
-\begin{frame}[plain,fragile]{Exploitation Applicative : Type Confusion}
+\begin{frame}[fragile]{Exploitation Applicative : Type Confusion}
     \begin{columns}[T]
         \begin{column}{0.48\textwidth}
             \textbf{Le Pivot Applicatif}
@@ -1042,7 +1045,7 @@
 
 
 
-\begin{frame}[plain]{Évolutions : GLIBC 2.42 \& 2.43}
+\begin{frame}{Évolutions : GLIBC 2.42 \& 2.43}
     \textbf{GLIBC 2.42 (Août 2025)}
     \vspace{-0.2cm}
     \begin{itemize}
@@ -1062,7 +1065,7 @@
 \end{frame}
 
 
-\begin{frame}[plain]{Bibliographie}
+\begin{frame}{Bibliographie}
     \scriptsize
     \begin{itemize}
         \item \textbf{Investigation x64 GLIBC Heap} (Rørvik) -- \url{https://www.scribd.com/document/555969660/HeapExplotationx64GlibC}
