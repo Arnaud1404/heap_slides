@@ -155,16 +155,17 @@
 
 \section{Introduction et Fondamentaux (4 min)}
 
-\begin{frame}{Objectif}
+\begin{frame}[plain]{Plan}
 
     \begin{itemize}
-        \item Fonctionnement de malloc (glibc 2.26 à 2.41)
-        \item Techniques d'exploitation
+        \item Fonctionnement de malloc
+        \item 3 bugs
+        \item Feng Shui
     \end{itemize}
 \end{frame}
 
 
-\begin{frame}{C'est quoi malloc(1 /3)}
+\begin{frame}[plain]{C'est quoi malloc(1 /3)}
 
     \begin{center}
         \begin{tikzpicture}[
@@ -203,28 +204,50 @@
     \end{center}
 
 \end{frame}
-\begin{frame}{C'est quoi malloc(2 /3)}
+\begin{frame}[plain]{C'est quoi malloc(2 /3)}
 
-\begin{frame}{ptmalloc2}
+    \begin{minipage}{0.40\textwidth}
+        \begin{tikzpicture}[
+                cell/.style={
+                        rectangle, draw=black, thick,
+                        minimum width=2.5cm,
+                        minimum height=8mm,
+                        align=center
+                    }
+            ]
 
-    brk()
+            % Hauteur d'une ligne
+            \def\chunkh{5mm}
+
+            % Ligne 1
+            \node[cell, anchor=west, fill=chunkPrevSize!20] (prev) at (0,0) {prev\_size};
+            \node[cell, anchor=west, fill=chunkSize!20] (size) at ([xshift=0mm]prev.east) {size};
+
+            % Ligne 2 (payload)
+            \node[cell, anchor=west, fill=chunkPayload!20, minimum width=5cm]
+            (payload) at ($(prev.south west)+(0,-\chunkh)$) {payload};
+
+            % Titre centré
+            \node[above=0.4cm,font=\bfseries] at ($(prev)!0.5!(size)$) {Chunk alloué};
+
+        \end{tikzpicture}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.50\textwidth}
+        \textbf{Signification des champs :}
+
+        \vspace{2mm}
+
+        \begin{itemize}
+            \item \textbf{prev\_size} : taille du chunk précédent (si libre)
+            \item \textbf{size} : taille du chunk courant + flags
+            \item \textbf{payload} : zone utilisateur et pointeur retourné par malloc
+        \end{itemize}
+    \end{minipage}
 
 \end{frame}
 
-\begin{frame}{Chunk}
-
-    \includegraphics{images/malloc_chunk_layout.png}
-
-\end{frame}
-
-\begin{frame}{Dans un processus}
-
-    pas de heap utilisateurs
-    brk()
-
-\end{frame}
-
-\begin{frame}{C'est quoi malloc(3 /3)}
+\begin{frame}[plain]{C'est quoi malloc(3 /3)}
 
     \begin{minipage}{0.40\textwidth}
         \begin{tikzpicture}[
@@ -278,10 +301,10 @@
                   dans la même bin
 
             \item \textbf{fd\_nextsize} : pointeur vers le prochain chunk
-                  \emph{de même taille}
+                  \emph{de taille différente}
 
             \item \textbf{bk\_nextsize} : pointeur vers le chunk précédent
-                  \emph{de même taille}
+                  \emph{de taille différente}
 
         \end{itemize}
 
@@ -291,7 +314,7 @@
 
 
 
-\begin{frame}{Tcache}
+\begin{frame}[plain]{Tcache}
 
     \begin{minipage}{0.40\textwidth}
 
@@ -456,7 +479,6 @@
 \end{frame}
 
 
-
 \begin{frame}[plain]{Largebins}
 
     \begin{minipage}{0.40\textwidth}
@@ -496,7 +518,7 @@
 
 \end{frame}
 
-\begin{frame}{Exemple largebins}
+\begin{frame}[plain]{Exemple largebins}
 
     \begin{tikzpicture}[
         bin/.style={
@@ -568,9 +590,27 @@
 
 
 
-\section{Le Cœur : 1 Type d'Exploit = 1 Primitive (12 min)}
+\section{Les techniques d'exploitation}
 
-\begin{frame}[plain,fragile]{Use-After-Free (UAF) \& Safe Linking (1/3)}
+\begin{frame}{Comment faire un exploit}
+
+    Un exploit = enchaînement de techniques. \\
+    Ces techniques reposent sur \textbf{3 bugs} et sur du \textbf{feng shui}.
+
+    \begin{itemize}
+        \item Use After Free (UAF) — oubli de réinitialiser un pointeur
+              après l’avoir libéré
+        \item Double free — libérer un chunk déjà libéré
+        \item Heap overflow — réécrire les données d’un chunk
+    \end{itemize}
+
+\end{frame}
+
+
+
+
+
+\begin{frame}[fragile]{Use-After-Free (UAF) \& Safe Linking (1/3)}
     \begin{columns}[T]
         \begin{column}{0.48\textwidth}
             \textbf{Vulnérabilité} : \textit{Use-After-Free}
@@ -786,10 +826,11 @@
     \end{ccode}
 \end{frame}
 
+
 \begin{frame}[fragile]{Largebin attack(1 /3)}
     \begin{ccode}
         int main(){
-                /* Disable IO buffering to prevent stream from interfering with heap */
+                /* Désactiver le buffering entrée/sortie pour éviter que les flux n’interfèrent avec la heap */
                 setvbuf(stdin, NULL, _IONBF, 0);
                 setvbuf(stdout, NULL, _IONBF, 0);
                 setvbuf(stderr, NULL, _IONBF, 0);
@@ -802,7 +843,7 @@
                 size_t *g3 = malloc(0x438);
                 free(p2);
 
-                p1[3] = (size_t)((&target) - 4); /* Overwrite metadata pointer */
+                p1[3] = (size_t)((&target) - 4); /* Écrase les métadonnées du pointeur */
                 size_t *g4 = malloc(0x438);
                 assert((size_t)(p2 - 2) == target);
                 return 0;
@@ -889,7 +930,7 @@
     \begin{ccode}
         int main()
         {
-                /* Overwrite metadata pointer */
+                /* Écrase les métadonnées du pointeur */
                 p1[3] = (size_t)((&target) - 4);
                 size_t *g4 = malloc(0x438);
             }
@@ -919,7 +960,7 @@
         % ===========================
         \node[bin] (bin64) at (0,0) {Largebin 64\\0x400–0x4FF};
         \visible<1-2>{\node[chunk, above=0.8cm of p1] (target) {target};}
-        \visible<1-2>{\node[bin, below=1.2cm of bin64] (unsorted) {Unsortedbin};}
+        \visible<1-2>{\node[bin, below=0.8cm of bin64] (unsorted) {Unsortedbin};}
 
         % ===========================
         % SLIDE 1–2 : état avant attaque
@@ -998,122 +1039,8 @@
 
 \section{Défenses et Perspectives (4 min)}
 
-\begin{frame}[fragile]{Largebin attack(3 /3)}
-    \begin{ccode}
-        int main()
-        {
-                /* Overwrite metadata pointer */
-        int main()
-        {
-                /* Overwrite metadata pointer */
-                p1[3] = (size_t)((&target) - 4);
-                size_t *g4 = malloc(0x438);
-            }
-    \end{ccode}
 
-    \begin{tikzpicture}[
-        bin/.style={
-                rectangle, draw=black, thick,
-                minimum width=3.2cm,
-                minimum height=1cm,
-                align=center
-            },
-        chunk/.style={
-                rectangle, draw=black, thick,
-                minimum width=2.6cm,
-                minimum height=7mm,
-                align=center
-            },
-        fdarrow/.style={-{Latex[length=3mm]}, thick, blue},
-        nextarrow/.style={-{Latex[length=3mm]}, thick, dashed, red},
-        prevarrow/.style={-{Latex[length=3mm]}, thick, dashed, orange},
-        every node/.style={font=\small}
-        ]
-
-        % ===========================
-        % BINS
-        % ===========================
-        \node[bin] (bin64) at (0,0) {Largebin 64\\0x400–0x4FF};
-        \visible<1-2>{\node[chunk, above=0.8cm of p1] (target) {target};}
-        \visible<1-2>{\node[bin, below=1.2cm of bin64] (unsorted) {Unsortedbin};}
-
-        % ===========================
-        % SLIDE 1–2 : état avant attaque
-        % ===========================
-
-        % p1 dans largebin (slide 1–2)
-        \visible<1-2>{
-            \node[chunk, right=1cm of bin64] (p1) {p1 : 0x428};
-        }
-
-        % p2 dans unsorted (slide 1–2)
-        \visible<1-2>{
-            \node[chunk, right=1cm of unsorted] (p2) {p2 : 0x418};
-            \node[chunk, right=1cm of p2] (arena) {Arena};
-            \draw[fdarrow] (p2.east) -- (arena.west);
-        }
-
-        % fd_nextsize boucle p1 (slide 1)
-        \visible<1>{
-            \draw[nextarrow] (p1.east)
-            .. controls +(0.8,0.6) and +(0.8,-0.6)
-            .. (p1.east);
-        }
-
-        \visible<1-2>{\draw[prevarrow] (p1.west)
-            .. controls +(-0.8,0.6) and +(-0.8,-0.6)
-            .. (p1.west);}
-
-        % corruption flèche p1 → target (slide 2)
-        \visible<2>{
-            \draw[nextarrow] (p1.north) -- (target.south)
-            node[midway, right]{overwrite fd\_nextsize};
-        }
-
-        % ===========================
-        % SLIDE 3 : état final après corruption
-        % ===========================
-
-        % p2 en bas du largebin
-        \visible<3>{
-            \node[chunk, right=1cm of bin64] (p2_3) {p2 : 0x418};
-        }
-
-        % p1 au milieu
-        \visible<3>{
-            \node[chunk, right=1cm of p2_3] (p1_3) {p1 : 0x428};
-        }
-
-        %target
-        \visible<3>{
-            \node[chunk, above=0.8cm of p2_3] (target_3) {\textbf{target = \&p2}};
-        }
-
-
-        % fd_next
-        \visible<3>{
-            \draw[nextarrow] ([yshift=3pt]p2_3.east) -- ([yshift=3pt]p1_3.west);
-            \draw[nextarrow] (p1_3.east)
-            .. controls +(0.8,0.6) and +(0.8,-0.6)
-            .. (p1_3.east);
-        }
-
-        %bk_next
-        \visible<3>{
-            \draw[prevarrow] ([yshift=-3pt]p1_3.west) -- ([yshift=-3pt]p2_3.east);
-            \draw[prevarrow] (p2_3.west)
-            .. controls +(-0.8,0.6) and +(-0.8,-0.6)
-            .. (p2_3.west);
-        }
-
-    \end{tikzpicture}
-
-\end{frame}
-
-
-
-
-\begin{frame}{Évolutions : GLIBC 2.42 \& 2.43}
+\begin{frame}[plain]{Évolutions : GLIBC 2.42 \& 2.43}
     \textbf{GLIBC 2.42 (Août 2025)}
     \vspace{-0.2cm}
     \begin{itemize}
