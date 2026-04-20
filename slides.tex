@@ -609,10 +609,10 @@
     \vspace{0.2em}
 
     \begin{ccode}
-        long *a = malloc(0x20); free(a); // 'a' dans Tcache
-        *a = 0xdeadbeef;                 // UAF : fd corrompu !
-        malloc(0x20);                    // Dépile 'a'
-        long *target = malloc(0x20);     // Ciblera 0xdeadbeef !
+        long *a = malloc(0x20); free(a); // Tcache[0x20] -> a
+        *a = 0xdeadbeef;                 // UAF écrase fd: Tcache -> a -> 0xdeadbeef
+        malloc(0x20);                    // Dépile 'a', Tcache -> 0xdeadbeef
+        long *target = malloc(0x20);     // malloc alloue à l'adresse 0xdeadbeef !
     \end{ccode}
     \vspace{0.2em}
 
