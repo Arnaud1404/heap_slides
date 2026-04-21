@@ -22,6 +22,7 @@
 - "La seconde étape repose sur le contrôle de l'état du tas. En déterminant l'ordre des allocations et libérations, il est possible de positionner des structures cibles à côté des blocs vulnérables."
 - "L'association de ces deux éléments permet de modifier des données critiques ou de dévier le flux d'exécution."
 
+AJOUTER TRANSITION
 ---
 
 ## 📽️ Slide 13 : Use-After-Free (UAF) & Tcache Poisoning
@@ -42,6 +43,7 @@
 - "Toute modification directe du pointeur produit un déchiffrement incorrect. L'allocateur tente alors d'accéder à une adresse invalide, causant l'arrêt du programme (SIGSEGV)."
 - "Pour contourner ce mécanisme, il devient indispensable de provoquer une fuite d'information (Heap Leak), souvent facilitée par une stratégie de saturation de la mémoire comme le Heap Spraying, afin d'exposer les adresses internes."
 
+CHECK DEFINITION HEAP SPRAYING
 ---
 
 ## 📽️ Slide 15 : Inversion de Safe Linking
@@ -50,15 +52,18 @@
 - **[LOOK AT - Schéma en cascade]** "Comme `L` et `P` partagent généralement les 12 mêmes bits de poids fort (sur la même page mémoire), un attaquant peut calculer la clé de chiffrement."
 - "Une fois l'adresse de base obtenue grâce au Heap Leak, l'attaquant peut chiffrer son propre pointeur puis l'injecter correctement dans les listes."
 
+DETAILLER ALGO et IMPACT ASLR
+
 ---
 
 ## 📽️ Slide 16 : Double Free - Fastbin Dup
 
 - **[Slide]** "Le **Double Free** consiste à libérer deux fois la même adresse mémoire pour fausser les listes de l'allocateur."
 - "La GLIBC bloque les doubles libérations consécutives. Toutefois, en intercalant une autre libération (`free(A); free(B); free(A)`), on contourne la vérification LIFO des Fastbins qui cible seulement le dernier bloc inséré."
-- **[EXPLICATION DU CODE - calloc]** "L'utilisation de `calloc` ici est volontaire. Contrairement à `malloc`, `calloc` met la mémoire à zéro et ignore le Tcache pour chercher dans les Fastbins. On évite ainsi les vérifications strictes (notamment le mécanisme de clé anti-double-free) du Tcache."
+- **[EXPLICATION DU CODE - calloc]** "L'utilisation de `calloc` ici est volontaire. Contrairement à `malloc`, `calloc` met la mémoire à zéro et ignore le Tcache pour chercher dans les Fastbins. On évite ainsi les vérifications strictes "
 - **[POINTER - Schéma Fastbin Dup (Boucle)]** "Cette séquence crée une liste circulaire. L'allocateur retourne alors deux pointeurs (ici `c` et `e`) qui référencent la même zone mémoire, permettant l'écrasement de données utilisées ailleurs dans le programme."
 
+REMETTRE OBJECTIF AU DEBUT (EN GENERAL)
 ---
 
 ## 📽️ Slide 17 : Heap Overflow & Overlapping
@@ -69,6 +74,7 @@
 - "Après avoir libéré `p2`, l'allocateur voit un seul grand espace libre. La réallocation de `p4` avec cette nouvelle taille couvre alors physiquement l'emplacement de `p3`."
 - **[REGARDER LE CODE - Ligne terminale]** "On se retrouve avec deux pointeurs sur la même zone : on peut modifier `p3` en écrivant normalement dans `p4`."
 
+EXPLIQUER LE -2 AU DEBUT, 
 ---
 
 ## 📽️ Slide 21 : Exploitation Applicative (Type Confusion)
@@ -78,6 +84,7 @@
 - **[REGARDER LE CODE - Structs definition]** "La Confusion de type exploite la réutilisation de la mémoire. Si on libère un objet `task_t` sans supprimer ses accès (donc un Use After Free), l'allocateur peut réallouer le même espace pour stocker un objet `msg_t`."
 - **[POINTER - Ligne 12]** "En écrivant dans le buffer de chaîne de caractères du message, on écrase en fait le pointeur de fonction de l'ancienne tâche. Lorsque la tâche est exécutée, le flux est dévié vers la fonction de notre choix, sans alerter les sécurités de l'allocateur."
 
+DETAILLER EXPLOIT NIVEAU APPLICATION + HYPOTHESES (MEME TAILLE)
 ---
 
 ## 📽️ Slide 22 : Évolutions - GLIBC 2.42 & 2.43
@@ -89,8 +96,5 @@
 
 ---
 
-## 🏁 Conclusion (Orale)
+## MOT DE FIN
 
-- "En résumé, l'exploitation des métadonnées de la GLIBC est devenue une discipline de haute précision, nécessitant quasi systématiquement des fuites d'information préalables."
-- "La tendance actuelle montre un déplacement du champ de bataille : des structures internes de l'allocateur vers la corruption directe des données métier de l'application."
-- "Nous vous remercions pour votre attention et sommes à votre disposition pour vos questions."

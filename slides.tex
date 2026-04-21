@@ -623,15 +623,9 @@
             *p = (intptr_t)((long)target ^ ((long)p >> 12));
 
             malloc(0x80); // Retourne p
-            <<<<<<< HEAD
-
-            // Le prochain retourne notre cible !
-            void *v = malloc(0x80);
-            =======
 
             // Le prochain retourne notre cible
             void *v = malloc(0x80);
-            >>>>>>> 5a3e7e27b1453c888c83e463329984132d0d7e9d
         \end{ccode}
 
         \vspace{0.5em}
