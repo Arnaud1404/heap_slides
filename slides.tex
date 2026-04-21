@@ -350,7 +350,7 @@
 
         \begin{itemize}
             \item Liste \textbf{simplement chaînée}
-            \item Un tcache par thread
+            \item Un tcache par thread donc pas de lock
             \item Jusqu’à 7 chunks par classe de taille
             \item Tailles : de \texttt{0x20} à \texttt{0x410}
         \end{itemize}
@@ -395,7 +395,7 @@
         \begin{itemize}
             \item Liste \textbf{simplement chaînée LIFO}
             \item Tailles fixes : \texttt{0x20} à \texttt{0x80}
-            \item Pas de consolidation immédiate
+            \item Pas de consolidation ou de fragmentation
         \end{itemize}
 
     \end{minipage}
