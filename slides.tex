@@ -822,40 +822,75 @@
 \end{frame}
 
 \begin{frame}[fragile]{Heap Overflow \& Overlapping}
-    \begin{columns}[T]
-        \begin{column}{0.48\textwidth}
-            \textbf{Mécanisme} (Cible : \texttt{size})
-            \begin{itemize}
-                \item Corruption de la taille d'un chunk libre ou alloué.
-            \end{itemize}
-        \end{column}
-        \begin{column}{0.48\textwidth}
-            \textbf{Conséquence}
-            \begin{itemize}
-                \item Chevauchement de mémoire (\textit{Overlapping chunks}).
-            \end{itemize}
-        \end{column}
-    \end{columns}
-    \vspace{-0.5em}
-    \begin{ccode}
-        long *p1 = malloc(0x80-8); long *p2 = malloc(0x500-8);
-        long *p3 = malloc(0x80-8); malloc(0x10); // Chunk de garde
+    \begin{minipage}[t]{0.56\textwidth}
+        \vspace{0pt}
+        \begin{ccode}
+            long *p1 = malloc(0x80 - 2);
+            long *p2 = malloc(0x500 - 2);
+            long *p3 = malloc(0x80 - 2);
+            malloc(0x20 - 2);
 
-        *(p2 - 1) = 0x581; // OVERFLOW (fake_size = 0x500 + 0x80 + 1)
-        free(p2); // p2 dans l'Unsorted Bin avec fausse taille
+            *(p2 - 1) = 0x581;
+            free(p2);
 
-        long *p4 = malloc(0x580 - 8); // Chevauche p3 !
-        memset(p4, '4', 0x580 - 8);   // Écrase p3 en silence
-    \end{ccode}
-    \vspace{-0.5em}
+            long *p4 = malloc(0x580 - 2);
+            memset(p4, '4', 0x580 - 2);
+        \end{ccode}
 
-    \begin{pwndbg}[heap]{text}
-        0x5...000 0x0...081 (p1)
-        @\makebox[0pt][l]{\fboxsep=0pt\color{red}\fbox{\phantom{0x5...080}}}0x5...080@ @\textcolor{pwndbgred}{0x0...581}@ (p2 corrompu, taille fake 0x580)
-        0x5...580 0x0...081 (p3 écrasé par p4)
-        ...
-        0x5...600 0x3434343434343434 (overwritten)
-    \end{pwndbg}
+        \vspace{0.6em}
+        \begin{tikzpicture}[
+            box/.style={rectangle, draw=black, thick, minimum width=0.8cm, minimum height=4mm, align=center, font=\tiny, fill=white},
+            arrow/.style={-Stealth, thick, chunkFd}
+        ]
+            \node[font=\tiny\bfseries, anchor=west] at (-0.8, -0.6) {Ligne 10 :};
+            \node[box] (p4) at (1.5, -0.2) {p4};
+            \node[box] (p3) at (1.5, -0.9) {p3};
+            
+            % Grande zone allouée pour p4
+            \node[box, fill=red!10, minimum height=12mm, minimum width=2.2cm] (bloc4) at (3.8, -0.55) {};
+            \node[font=\tiny\bfseries, red] at (3.8, -0.2) {Contenu p4};
+            
+            % Petite zone incluse pour p3
+            \node[box, fill=green!20, minimum height=4mm, minimum width=2.0cm, anchor=south] (bloc3) at (3.8, -1.1) {Contenu p3};
+            
+            \draw[arrow] (p4.east) -- (bloc4.west |- p4.east);
+            \draw[arrow] (p3.east) -- (bloc3.west |- p3.east);
+        \end{tikzpicture}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}[t]{0.42\textwidth}
+        \vspace{0pt}
+        \centering
+        \textbf{Overlapping Chunks}
+        \vspace{0.8em}
+
+        \begin{tikzpicture}[
+            chunk/.style={rectangle, draw=black, thick, minimum width=2.4cm, align=center, font=\tiny},
+            arrow/.style={-Stealth, thick, red},
+            scale=0.85, transform shape
+        ]
+            % Chunks normaux
+            \node[chunk, fill=gray!20, minimum height=0.5cm] (p1) {p1 (0x80)};
+            \node[chunk, fill=blue!10, minimum height=1.2cm, below=0 of p1] (p2) {p2 (0x500)};
+            \node[chunk, fill=green!20, minimum height=0.5cm, below=0 of p2] (p3) {p3 (0x80)};
+            \node[chunk, fill=gray!20, minimum height=0.3cm, below=0 of p3] (guard) {Garde (0x20)};
+
+            % Overlay p4
+            \node[chunk, draw=red, thick, fill=red!10, fill opacity=0.8, text opacity=1, minimum height=1.7cm, minimum width=1.8cm, font=\tiny\bfseries, text=red, left=0.8cm of p2, yshift=-0.25cm] (p4) {p4 (0x580)\\[0.1cm]\textit{\'Ecrase p3 !}};
+
+            % Texte et flèche Overflow au dessus de p4, pointant vers p2 en diagonale
+            \node[font=\tiny\bfseries, red, anchor=south] (overflowText) at ([yshift=0.1cm]p4.north) {Overflow};
+            \draw[arrow] (overflowText.south east) -- ([yshift=-0.1cm]p2.north west);
+
+            % Size modifiée
+            \node[font=\tiny\bfseries, red, anchor=north west, xshift=0.05cm, yshift=-0.05cm] (fakeSize) at (p2.north west) {\texttt{size=0x581}};
+            
+            % Fleches de chevauchement
+            \draw[dashed, red, thick] (p2.north west) -- (p4.north east);
+            \draw[dashed, red, thick] (p3.south west) -- (p4.south east);
+
+        \end{tikzpicture}
+    \end{minipage}
 \end{frame}
 
 \begin{frame}[fragile]{Largebin Attack (1/3)}

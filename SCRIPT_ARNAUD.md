@@ -60,8 +60,9 @@ Ce script utilise un ton neutre et factuel, adapté à une présentation techniq
 
 - **[Slide]** "Le troisième point concerne le **Heap Overflow**, qui est un débordement de mémoire classique."
 - "Si une application ne vérifie pas la taille des données saisies, on peut déborder d'un buffer et modifier le champ **size** du bloc voisin."
-- **[POINTER - Valeur corrompue en rouge]** "En modifiant cette taille, on force l'allocateur à considérer un bloc beaucoup plus grand qu'il ne l'est réellement."
-- "Lorsqu'on réalloue cet espace, on obtient un bloc qui **chevauche** d'autres données présentes en mémoire, ce qui permet de les écraser."
+- **[POINTER - Diagramme de droite]** "Comme on le voit avec la flèche rouge d'overflow, on modifie la taille du chunk `p2` pour lui faire croire qu'il inclut aussi le chunk `p3`."
+- "Lorsqu'on libère puis réalloue cet espace, l'allocateur nous donne le chunk `p4` qui **chevauche** `p3`."
+- **[REGARDER LE CODE - Ligne terminale]** "On peut alors écraser silencieusement les données du chunk `p3`, qui est pourtant toujours considéré comme actif par l'application."
 
 ---
 
