@@ -517,13 +517,15 @@
         \begin{itemize}
             \item Liste \textbf{doublement chaînée FIFO}
             \item Tailles : \texttt{0x400} → \texttt{limite mmap (128ko)}
+            \item fd / bk : Chunks de même taille
+            \item fd\_nextsize / bk\_nextsize : Sous-bins rangés
         \end{itemize}
 
     \end{minipage}
 
 \end{frame}
 
-\begin{frame}{Fonctionnement des Largebins}
+\begin{frame}[plain]{Fonctionnement des largebins}
 
     \begin{tikzpicture}[
         bin/.style={
@@ -546,16 +548,17 @@
         % ===========================
         % Sous-bins (VERTICAUX)
         % ===========================
-        \node[bin] (bin64) at (0,0) {Sous-bin 64\\0x500–0x5FF};
-        \node[bin, below=1.2cm of bin64] (bin63) {Sous-bin 63\\0x400–0x4FF};
-        \node[bin, below=1.2cm of bin63] (bin64b) {Sous-bin 64\\0x500–0x5FF};
+        \node[bin] (bin64) at (0,0) {Sous-bin\\0x500–0x530};
+        \node[bin, below=1.2cm of bin64] (bin63) {Sous-bin\\0x480–0x4b0};
+        \node[bin, below=1.2cm of bin63] (bin64b) {Sous-bin\\0x500–0x530};
 
         % ===========================
         % Chunks
         % ===========================
         \node[chunk, right=1cm of bin63] (A) {A : 0x480};
-        \node[chunk, right=1cm of bin64] (B) {B : 0x520};
-        \node[chunk, right=1cm of bin64b] (C) {C : 0x580};
+        \node[chunk, right=1cm of bin64] (B) {B : 0x510};
+        \node[chunk, right=1cm of bin64b] (C) {C : 0x520};
+        \node[chunk, right=1cm of A] (arena) {Arena};
 
         % ===========================
         %  boucles
@@ -565,9 +568,9 @@
         \visible<3>{\draw[nextarrow] (C.south) .. controls +(0.6,-0.8) and +(-0.6,-0.8) .. (C.south);}
 
         % ===========================
-        % fd(B→A)
+        % fd(B→arena)
         % ===========================
-        \visible<2->{\draw[fdarrow] (B.south) -- ++(0,-0.4) -| (A.north);}
+        \visible<2->{\draw[fdarrow] (B.south) -- ++(0,-0.4) -| (arena.north);}
 
         % ===========================
         %  fd_nextsize(B→C) remplace la boucle de B
@@ -575,19 +578,19 @@
         \visible<3->{\draw[nextarrow] (B.east) -- ++(0.8,0) |- (C.east);}
 
         % ===========================
-        % fd(A→C)
+        % fd(A→arena)
         % ===========================
-        \visible<3->{\draw[fdarrow] (A.south) -- ++(0,-0.4) -| (C.north);}
+        \visible<3->{\draw[fdarrow] (A.south) -- ++(0,-0.4) -| (arena.west);}
 
         % ===========================
         % LÉGENDE
         % ===========================
-        \node[anchor=west] at (7,-1.8) {\textbf{Légende :}};
-        \draw[fdarrow] (7,-2.3) -- ++(0.8,0);
-        \node[anchor=west] at (8,-2.3) {fd};
+        \node[anchor=west] at (7,-3.8) {\textbf{Légende :}};
+        \draw[fdarrow] (7,-4.3) -- ++(0.8,0);
+        \node[anchor=west] at (8,-4.3) {fd};
 
-        \draw[nextarrow] (7,-2.7) -- ++(0.8,0);
-        \node[anchor=west] at (8,-2.7) {fd\_nextsize};
+        \draw[nextarrow] (7,-4.7) -- ++(0.8,0);
+        \node[anchor=west] at (8,-4.7) {fd\_nextsize};
 
     \end{tikzpicture}
 
