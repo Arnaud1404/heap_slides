@@ -1,98 +1,96 @@
 # Script Oral - Arnaud (10 minutes)
 
-Ce script utilise un ton neutre et factuel, adapté à une présentation technique universitaire.
+> **PRÉAMBULE : TON DE LA PRÉSENTATION**
+> Ce script est rédigé et doit être prononcé selon les directives suivantes :
+> - **Ton** : Strictement neutre, concis et factuel.
+> - **Vocabulaire** : Technique et précis (aucun adjectif familier ou exagéré, pas de formulations "farfelues").
+> - **Profondeur** : Justifie de manière didactique les subtilités (comme l'utilisation de `calloc` pour contourner le Tcache, ou le calcul `0x80 - 2`) en s'appuyant directement sur le rapport technique (`main.tex`).
 
 ---
 
 ## 🟢 Transition (Après Kamiel)
 
-- **[Transition]** "Merci Kamiel. Après avoir vu le fonctionnement théorique de l'allocateur, nous allons maintenant aborder les techniques d'exploitation concrètes."
-- "Je vais vous présenter les bases de l'exploitation actuelle, qui repose sur trois types de vulnérabilités et sur l'organisation de la mémoire, ce qu'on appelle le Feng Shui de la heap."
+- **[Transition]** "Après l'analyse des mécanismes de tri par Kamiel, nous allons étudier l'application concrète des primitives d'exploitation."
+- "L'exploitation du tas repose sur un enchaînement d'étapes, impliquant une corruption initiale de la mémoire, suivie d'une manipulation de son agencement, appelée *Heap Feng Shui*."
 
 ---
 
 ## 📽️ Slide 12 : Les bases d'un exploit
 
-- **[Slide]** "Un exploit n'est pas le fruit du hasard, c'est une méthode qui se déroule généralement en trois étapes."
-- **[POINTER - Colonne de gauche]** "On commence par identifier un bug initial, comme un Use-After-Free, un Double Free ou un débordement classique (overflow)."
-- "Ensuite, on utilise le Feng Shui pour organiser la mémoire et placer nos données aux bons endroits."
-- "En combinant ces éléments, on parvient à détourner le flux d'exécution pour prendre le contrôle du programme."
+- **[Slide]** "Une exploitation s'effectue généralement en trois phases."
+- **[POINTER - Liste des étapes]** "La première étape consiste à obtenir une primitive de corruption mémoire : l'utilisation d'un pointeur après libération (Use-After-Free), une double libération (Double Free) ou un débordement de buffer (Heap Overflow)."
+- "La seconde étape repose sur le contrôle de l'état du tas. En déterminant l'ordre des allocations et libérations, il est possible de positionner des structures cibles à côté des blocs vulnérables."
+- "L'association de ces deux éléments permet de modifier des données critiques ou de dévier le flux d'exécution."
 
 ---
 
 ## 📽️ Slide 13 : Use-After-Free (UAF) & Tcache Poisoning
 
-- **[Slide]** "L'attaque la plus courante sur le Tcache est le Poisoning, souvent basé sur une vulnérabilité de type Use-After-Free."
-- "Le principe est le suivant : on libère un bloc de mémoire, mais le programme conserve un pointeur vers celui-ci, ce qui permet de continuer à le modifier."
-- **[REGARDER LE CODE - Ligne 5]** "Ici, nous appliquons l'empoisonnement : nous écrivons notre adresse cible dans le pointeur `fd`. Comme on le voit sur le schéma à droite, on remplace le lien normal par l'adresse de notre cible."
-- **[POINTER - Flèche Arbitrary Write]** "Le premier `malloc` retire `p` de la liste. L'allocateur regarde alors le pointeur `fd` que nous avons falsifié pour trouver le bloc suivant."
-- "Résultat : la liste pointe maintenant sur notre cible. Le deuxième `malloc` nous renvoie alors directement l'adresse choisie, nous permettant d'écrire n'importe où en mémoire."
+- **[Slide]** "Le Tcache est souvent ciblé via une vulnérabilité Use-After-Free (UAF)."
+- "Le problème survient lorsqu'un programme conserve et utilise un pointeur vers un `chunk` qui a déjà été libéré avec `free`."
+- **[REGARDER LE CODE - Ligne 5]** "Dans cet exemple, le UAF permet d'écraser le pointeur `fd` du bloc libéré. Jusqu'à récemment, le Tcache, conçu comme une liste simplement chaînée rapide, ne vérifiait pas la validité de ces pointeurs."
+- **[POINTER - Schéma Tcache vers Target]** "En remplaçant `fd` par une adresse voulue, la structure de la liste est modifiée. Lors de l'allocation suivante, la tête de liste pointe vers l'adresse injectée."
+- "La dernière allocation (`v = malloc(...)`) retourne alors un pointeur sur cette adresse, offrant une lecture et écriture arbitraire en mémoire."
 
 ---
 
 ## 📽️ Slide 14 : Défense - Safe Linking
 
-- **[Slide]** "Depuis 2020, la GLIBC intègre une protection nommée **Safe Linking** pour contrer cette technique."
-- "L'idée est de ne plus stocker les pointeurs en clair, mais de les masquer avec une opération XOR."
-- **[POINTER - Formule mathématique]** "Si on écrit une adresse directement sans tenir compte de ce masquage, le système détecte une incohérence et le programme s'arrête."
-- "Pour réussir l'attaque, il faut d'abord obtenir un **Heap Leak**, c'est-à-dire une fuite mémoire pour récupérer la clé de chiffrement."
+- **[Slide]** "Pour empêcher le Tcache Poisoning, la version 2.32 de la GLIBC a introduit le **Safe Linking**."
+- "Cette protection masque les pointeurs stockés dans les listes simplement chaînées."
+- **[POINTER - Formule mathématique]** "Le pointeur est chiffré par l'opération logique `(L >> 12) ^ P`, où `L` est l'adresse où le pointeur est stocké et `P` l'adresse mémoire cible."
+- "Toute modification directe du pointeur produit un déchiffrement incorrect. L'allocateur tente alors d'accéder à une adresse invalide, causant l'arrêt du programme (SIGSEGV)."
+- "Pour contourner ce mécanisme, il devient indispensable de provoquer une fuite d'information (Heap Leak), souvent facilitée par une stratégie de saturation de la mémoire comme le Heap Spraying, afin d'exposer les adresses internes."
 
 ---
 
 ## 📽️ Slide 15 : Inversion de Safe Linking
 
-- **[Slide]** "Ce masquage n'est pas une protection absolue car il repose sur un algorithme simple (XOR-shift)."
-- **[LOOK AT - Schéma en cascade]** "Comme on le voit sur ce schéma, l'adresse du bloc est utilisée pour masquer le pointeur. On peut donc inverser l'opération bit après bit."
-- "Une fois la clé reconstruite, on peut chiffrer l'adresse que l'on veut atteindre et ainsi passer la sécurité du Safe Linking."
+- **[Slide]** "Le Safe Linking repose sur un XOR, une opération symétrique et réversible."
+- **[LOOK AT - Schéma en cascade]** "Comme `L` et `P` partagent généralement les 12 mêmes bits de poids fort (sur la même page mémoire), un attaquant peut calculer la clé de chiffrement."
+- "Une fois l'adresse de base obtenue grâce au Heap Leak, l'attaquant peut chiffrer son propre pointeur puis l'injecter correctement dans les listes."
 
 ---
 
 ## 📽️ Slide 16 : Double Free - Fastbin Dup
 
-- **[Slide]** "La deuxième technique utilise le bug du **Double Free**, qui consiste à libérer deux fois le même bloc de mémoire."
-- "L'objectif est de créer une boucle dans les listes de l'allocateur pour obtenir plusieurs accès au même emplacement."
-- **[POINTER - Liste fastbin]** "Dans les Fastbins, en libérant le bloc A, puis le bloc B, et enfin à nouveau le bloc A, on peut tromper la vérification de sécurité."
-- "On finit par avoir deux pointeurs sur la même zone mémoire, ce qui permet de modifier des données sensibles sans être détecté."
+- **[Slide]** "Le **Double Free** consiste à libérer deux fois la même adresse mémoire pour fausser les listes de l'allocateur."
+- "La GLIBC bloque les doubles libérations consécutives. Toutefois, en intercalant une autre libération (`free(A); free(B); free(A)`), on contourne la vérification LIFO des Fastbins qui cible seulement le dernier bloc inséré."
+- **[EXPLICATION DU CODE - calloc]** "L'utilisation de `calloc` ici est volontaire. Contrairement à `malloc`, `calloc` met la mémoire à zéro et ignore le Tcache pour chercher dans les Fastbins. On évite ainsi les vérifications strictes (notamment le mécanisme de clé anti-double-free) du Tcache."
+- **[POINTER - Schéma Fastbin Dup (Boucle)]** "Cette séquence crée une liste circulaire. L'allocateur retourne alors deux pointeurs (ici `c` et `e`) qui référencent la même zone mémoire, permettant l'écrasement de données utilisées ailleurs dans le programme."
 
 ---
 
 ## 📽️ Slide 17 : Heap Overflow & Overlapping
 
-- **[Slide]** "Le troisième point concerne le **Heap Overflow**, qui est un débordement de mémoire classique."
-- "Si une application ne vérifie pas la taille des données saisies, on peut déborder d'un buffer et modifier le champ **size** du bloc voisin."
-- **[POINTER - Diagramme de droite]** "Comme on le voit avec la flèche rouge d'overflow, on modifie la taille du chunk `p2` pour lui faire croire qu'il inclut aussi le chunk `p3`."
-- "Lorsqu'on libère puis réalloue cet espace, l'allocateur nous donne le chunk `p4` qui **chevauche** `p3`."
-- **[REGARDER LE CODE - Ligne terminale]** "On peut alors écraser silencieusement les données du chunk `p3`, qui est pourtant toujours considéré comme actif par l'application."
-
----
-
-## 📽️ Slide 18-20 : Largebin Attack
-
-- **[Slides]** "Cette technique est plus complexe car elle manipule les listes doublement chaînées des Largebins."
-- "Le principe reste le même : on détourne un mécanisme interne de l'allocateur pour transformer une modification de pointeur en une écriture forcée en mémoire."
-- "C'est une attaque qui demande plus de conditions mais qui permet des écritures très précises."
+- **[Slide]** "Le **Heap Overflow** consiste à déborder d'un buffer pour écraser les métadonnées du bloc suivant."
+- "Dans cet exemple, l'allocation de `0x80 - 2` est calibrée pour que les données de l'utilisateur arrivent exactement à la limite du bloc voisin sans laisser d'espace vide."
+- **[POINTER - Diagramme de droite]** "En écrivant un octet de trop, on modifie le champ `size` du bloc `p2`. On lui donne une valeur falsifiée pour lui faire croire qu'il est plus grand et qu'il englobe aussi le bloc `p3`."
+- "Après avoir libéré `p2`, l'allocateur voit un seul grand espace libre. La réallocation de `p4` avec cette nouvelle taille couvre alors physiquement l'emplacement de `p3`."
+- **[REGARDER LE CODE - Ligne terminale]** "On se retrouve avec deux pointeurs sur la même zone : on peut modifier `p3` en écrivant normalement dans `p4`."
 
 ---
 
 ## 📽️ Slide 21 : Exploitation Applicative (Type Confusion)
 
-- **[Slide]** "Aujourd'hui, face au renforcement des sécurités de la GLIBC, on voit apparaître des attaques dites **applicatives** (ou Data-Only)."
-- "Au lieu d'attaquer les structures internes de l'allocateur, on s'attaque directement aux données métiers du programme."
-- **[REGARDER LE CODE - Struct task_t]** "Dans cet exemple, on utilise une confusion de type pour remplacer un message par une structure de tâche."
-- "Le programme pense lire une chaîne de caractères, mais il exécute en réalité l'adresse d'une fonction que nous avons injectée."
+- **[Slide]** "Suite à l'ajout continu de vérifications sur les métadonnées par la GLIBC, les attaques se tournent vers les données applicatives (ou Data-Only)."
+- "Le but n'est plus de corrompre les structures internes de `malloc`, mais de manipuler directement les objets définis par le développeur."
+- **[REGARDER LE CODE - Structs definition]** "La Confusion de type exploite la réutilisation de la mémoire. Si on libère un objet `task_t` sans supprimer ses accès (donc un Use After Free), l'allocateur peut réallouer le même espace pour stocker un objet `msg_t`."
+- **[POINTER - Ligne 12]** "En écrivant dans le buffer de chaîne de caractères du message, on écrase en fait le pointeur de fonction de l'ancienne tâche. Lorsque la tâche est exécutée, le flux est dévié vers la fonction de notre choix, sans alerter les sécurités de l'allocateur."
 
 ---
 
 ## 📽️ Slide 22 : Évolutions - GLIBC 2.42 & 2.43
 
-- **[Slide]** "Pour finir sur les évolutions récentes, sachez que les versions 2.42 et 2.43 de la GLIBC ferment plusieurs de ces failles."
-- "La 2.42 ajoute des vérifications pour bloquer la Largebin Attack, et la 2.43 supprime les Fastbins, qui étaient une source historique de vulnérabilités."
-- "Cela montre que l'exploitation des métadonnées devient de plus en plus difficile."
+- **[Slide]** "Les versions récentes de la GLIBC intègrent de nouvelles vérifications pour limiter ces techniques."
+- "**GLIBC 2.42** : Cette version bloque la Largebin Attack. Lors de l'ajout d'un bloc, le système vérifie que les pointeurs `fd_nextsize` et `bk_nextsize` sont cohérents et forment une boucle valide (`P->bk_nextsize->fd_nextsize == P`). En cas d'incohérence, le programme s'arrête."
+- "**GLIBC 2.43** : Cette version supprime totalement les **Fastbins**. Ces listes, manquant de vérifications solides, sont abandonnées pour le Tcache et les Smallbins."
+- "De plus, le Safe Linking s'applique désormais de manière globale, sécurisant une plus grande part des listes internes."
 
 ---
 
-## 📽️ Slide 23 : Conclusion
+## 🏁 Conclusion (Orale)
 
-- **[Slide]** "Pour conclure, s'il est devenu très complexe de prendre le contrôle direct du processeur via la heap, le risque reste présent."
-- "Le danger s'est déplacé vers la **corruption de données applicatives**, où l'on modifie le comportement du logiciel sans casser les règles de la mémoire."
-- "Merci de votre attention, nous sommes disponibles pour répondre à vos questions."
+- "En résumé, l'exploitation des métadonnées de la GLIBC est devenue une discipline de haute précision, nécessitant quasi systématiquement des fuites d'information préalables."
+- "La tendance actuelle montre un déplacement du champ de bataille : des structures internes de l'allocateur vers la corruption directe des données métier de l'application."
+- "Nous vous remercions pour votre attention et sommes à votre disposition pour vos questions."
