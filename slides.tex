@@ -615,7 +615,8 @@
     \begin{minipage}[t]{0.56\textwidth}
         \vspace{0pt}
         \begin{ccode}
-            intptr_t *p = malloc(0x80); free(p);
+            intptr_t *p = malloc(0x80); 
+            free(p);
             // p est dans le Tcache
 
             // Corruption de 'fd' (Safe Linking)
@@ -623,7 +624,7 @@
 
             malloc(0x80); // Retourne p
             
-            // Le prochain retourne notre cible !
+            // Le prochain retourne notre cible
             void *v = malloc(0x80); 
         \end{ccode}
 
@@ -1086,34 +1087,54 @@
 
 
 \begin{frame}[fragile]{Exploitation Applicative : Type Confusion}
-    \begin{columns}[T]
-        \begin{column}{0.48\textwidth}
-            \textbf{Le Pivot Applicatif}
-            \begin{itemize}
-                \item GLIBC ignorée.
-                \item Cible : Logique interne du programme.
-            \end{itemize}
-        \end{column}
-        \begin{column}{0.48\textwidth}
-            \textbf{Avantage Majeur}
-            \begin{itemize}
-                \item Aucune sécurité type \textit{Safe Linking}.
-            \end{itemize}
-        \end{column}
-    \end{columns}
-    \vspace{0.2em}
-    \begin{ccode}
-        typedef struct { void (*execute)(); } task_t; // 8 octets
-        typedef struct { char content[8]; } msg_t;    // 8 octets
+    \begin{minipage}[t]{0.56\textwidth}
+        \vspace{0pt}
+        \begin{ccode}
+            typedef struct { void (*execute)(); } task_t;
+            typedef struct { char content[8]; } msg_t;
 
-        task_t *task = malloc(sizeof(task_t)); task->execute = lose;
-        free(task); // UAF: dangling pointer !
+            task_t *task = malloc(sizeof(task_t));
+            task->execute = lose;
+            free(task); // UAF: dangling pointer !
 
-        msg_t *msg = malloc(sizeof(msg_t)); // Allocation même taille
-        *(long *)msg->content = (long)win;  // Confusion de type
+            msg_t *msg = malloc(sizeof(msg_t)); // Allocation
+            
+            // Confusion de type: écrase le pointeur
+            *(long *)msg->content = (long)win;  
 
-        task->execute(); // Exécute win() !
-    \end{ccode}
+            task->execute(); // Exécute win() !
+        \end{ccode}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}[t]{0.42\textwidth}
+        \vspace{0pt}
+        \centering
+        \textbf{Type Confusion}
+        \vspace{0.8em}
+
+        \begin{tikzpicture}[
+            cell/.style={rectangle, draw=black, thick, minimum width=2.4cm, minimum height=6mm, align=center, font=\tiny},
+            scale=0.85, transform shape
+        ]
+            % T=1
+            \node[font=\tiny\bfseries] (t1) at (0,0) {1. Allocation (\texttt{task\_t})};
+            \node[cell, fill=chunkSize!20, below=0.1cm of t1] (size1) {size : 0x20};
+            \node[cell, fill=chunkPayload!30, below=0mm of size1] (pay1) {\texttt{execute} = \textbf{lose}};
+
+            % T=2
+            \node[font=\tiny\bfseries, below=0.9cm of pay1] (t2) {2. Réallocation (\texttt{msg\_t})};
+            \node[cell, fill=chunkSize!20, below=0.1cm of t2] (size2) {size : 0x20};
+            \node[cell, fill=chunkBkNext!30, below=0mm of size2] (pay2) {\texttt{content} = \textbf{win}};
+
+            % Fleche
+            \draw[-Stealth, thick, red] (pay1.south) -- (t2.north) node[midway, right, align=left, font=\tiny, text=black] {UAF : pointeur\\ \texttt{task} actif};
+            
+            % T=3
+            \node[font=\small\bfseries, text=red, below=0.5cm of pay2] (t3) {\texttt{task->execute()}};
+            \draw[-Stealth, thick, red, dashed] (pay2.south) -- (t3.north) node[midway, right, font=\tiny, text=black] {Appelle \textbf{win} !};
+
+        \end{tikzpicture}
+    \end{minipage}
 \end{frame}
 
 
